@@ -1,6 +1,6 @@
 # MathAlarm — Product Requirements Document
 
-**Status:** Draft v0.2
+**Status:** Draft v0.3
 **Last updated:** 2026-08-22
 **Owner:** (you)
 **Platform:** Android (Expo / React Native + TypeScript)
@@ -112,9 +112,10 @@ An alarm can repeat on chosen weekdays (e.g. Mon–Fri). After firing, a repeat 
 - **Builds:** EAS Build (Expo's hosted build service). Chosen over a local Android toolchain because it keeps multi-gigabyte SDK and Gradle caches off this machine.
 - **On-device target:** a **development build** produced with `expo-dev-client`, installed on the phone in place of Expo Go.
 - **Min SDK:** TBD (target a reasonable modern floor, e.g. Android 8+/API 26 — confirm during setup)
-- **Alarm scheduling:** `AlarmManager` with `setAlarmClock()` / exact alarms for reliability — reached from JS via a native module (candidate: `@notifee/react-native`).
-- **Wake screen:** Full-screen notification intent + Activity shown over lock screen (`setShowWhenLocked`, `setTurnScreenOn`), configured through an Expo config plugin.
-- **Audio:** Alarm-stream playback that overrides silent/vibrate; vibration via the Vibrator API. Likely needs custom native code — see risk 3 below.
+- **Native alarm module:** a **custom local Expo Module** written in Kotlin, living in `modules/` and created with `npx create-expo-module@latest --local`. It owns all three risky capabilities (scheduling, wake screen, alarm audio) behind one TypeScript API. See the decision log for why this beat off-the-shelf libraries.
+- **Alarm scheduling:** `AlarmManager` with `setAlarmClock()` for reliability, called from the custom module.
+- **Wake screen:** Full-screen notification intent + Activity shown over lock screen (`setShowWhenLocked`, `setTurnScreenOn`), declared by the custom module's own config plugin.
+- **Audio:** Alarm-stream (`STREAM_ALARM`) playback that overrides silent/vibrate, plus vibration via the Vibrator API — both handled natively inside the custom module.
 - **Persistence:** Local only — SQLite via `expo-sqlite` (or AsyncStorage for a first pass). No network.
 - **Background/reliability:** Handle reboot (reschedule alarms via `BOOT_COMPLETED`), Doze mode, and battery-optimization exemptions.
 - **Permissions:** Exact alarm (Android 12+), notifications (Android 13+), full-screen intent (Android 14+), boot-completed, wake lock, vibrate.
@@ -125,7 +126,7 @@ Expo Go ships a fixed set of native modules and includes **none** of the three r
 ### Key technical risks (build/prototype first)
 1. **Reliable firing** when app is killed + phone locked + Doze mode.
 2. **Full-screen wake screen** appearing over the lock screen.
-3. **Sound over silent mode** — no React Native audio library reliably exposes the Android ALARM stream, so this most likely needs a small custom native module. Prototype it early.
+3. **Sound over silent mode** — no React Native audio library reliably exposes the Android ALARM stream. Confirmed: this requires custom native code, which is what drove the custom-module decision. Prototype it early.
 > These three are the risky 20%. Prototype them on a development build before building polished UI.
 
 ---
@@ -178,6 +179,11 @@ v1 is successful when:
 - **Stack:** ✅ Expo (React Native + TypeScript + Expo Router) instead of Kotlin/Jetpack Compose. *(2026-08-22)*
 - **Build pipeline:** ✅ EAS Build in the cloud, not local Android builds — keeps heavy SDK/Gradle caches off a nearly full C: drive. *(2026-08-22)*
 - **On-device runtime:** ✅ A `expo-dev-client` development build, not Expo Go, because Expo Go cannot do exact alarms, full-screen intents, or alarm-stream audio. *(2026-08-22)*
+- **Native alarm module:** ✅ Write a **custom local Expo Module in Kotlin** rather than depend on a third-party notification library. *(2026-08-22)*
+  - `@notifee/react-native`, the original candidate, was **archived by Invertase on 2026-04-07** (last release v9.1.8, Dec 2024) and is no longer maintained.
+  - `expo-notifications` (SDK 57) supports exact alarms but documents **no full-screen intent support** and explicitly respects silent mode, so it cannot deliver the core wake mechanic on its own.
+  - `react-native-notify-kit`, the community fork of Notifee, does cover exact alarms and full-screen intents and looks healthy, but its stated development target is RN 0.85.3 (this project is on 0.86 / SDK 57), it is effectively single-maintainer, and it still leaves alarm-stream audio unsolved.
+  - Decisive factor: **alarm-stream audio requires custom Kotlin regardless of library choice.** Given that, one self-owned module covering scheduling + wake screen + audio removes a third-party dependency from the critical path of an app whose entire job is to wake the user up reliably.
 
 ### Still open (resolve during technical setup)
 - **Min SDK / target devices:** proposed floor Android 8 / API 26 — confirm when scaffolding.
