@@ -48,6 +48,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b94d3919-e9f6-4cf4-b803-49ab261bc113"
+      }
+    },
+    "owner": "aetheramizus-team"
   }
 }
