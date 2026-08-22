@@ -1,9 +1,9 @@
 # MathAlarm — Product Requirements Document
 
-**Status:** Draft v0.1
-**Last updated:** 2026-08-20
+**Status:** Draft v0.2
+**Last updated:** 2026-08-22
 **Owner:** (you)
-**Platform:** Android (Kotlin + Jetpack Compose)
+**Platform:** Android (Expo / React Native + TypeScript)
 
 ---
 
@@ -15,7 +15,7 @@
 
 **The solution:** A free, clean math alarm where the core wake-up mechanic is never behind a paywall. Built Android-first, for real personal use and as a portfolio piece.
 
-**Why it matters (portfolio angle):** Demonstrates native Android skills (reliable background alarms, full-screen intents, audio, local persistence) plus product thinking — solving a real, personally-felt problem with a clear market gap.
+**Why it matters (portfolio angle):** Demonstrates cross-platform app development plus the native Android integration the hard parts demand (reliable background alarms, full-screen intents, alarm-stream audio, local persistence), and product thinking — solving a real, personally-felt problem with a clear market gap.
 
 ---
 
@@ -107,21 +107,26 @@ An alarm can repeat on chosen weekdays (e.g. Mon–Fri). After firing, a repeat 
 
 ## 7. Technical Requirements
 
-- **Language:** Kotlin
-- **UI:** Jetpack Compose
+- **Framework:** Expo (SDK 57) — React Native + TypeScript.
+- **Routing / UI:** Expo Router (file-based routing) with React Native components.
+- **Builds:** EAS Build (Expo's hosted build service). Chosen over a local Android toolchain because it keeps multi-gigabyte SDK and Gradle caches off this machine.
+- **On-device target:** a **development build** produced with `expo-dev-client`, installed on the phone in place of Expo Go.
 - **Min SDK:** TBD (target a reasonable modern floor, e.g. Android 8+/API 26 — confirm during setup)
-- **Alarm scheduling:** `AlarmManager` with `setAlarmClock()` / exact alarms for reliability.
-- **Wake screen:** Full-screen notification intent + Activity shown over lock screen (`setShowWhenLocked`, `setTurnScreenOn`).
-- **Audio:** Alarm-stream playback that overrides silent/vibrate; vibration via Vibrator API.
-- **Persistence:** Local only — Room database (or DataStore) for saved alarms. No network.
+- **Alarm scheduling:** `AlarmManager` with `setAlarmClock()` / exact alarms for reliability — reached from JS via a native module (candidate: `@notifee/react-native`).
+- **Wake screen:** Full-screen notification intent + Activity shown over lock screen (`setShowWhenLocked`, `setTurnScreenOn`), configured through an Expo config plugin.
+- **Audio:** Alarm-stream playback that overrides silent/vibrate; vibration via the Vibrator API. Likely needs custom native code — see risk 3 below.
+- **Persistence:** Local only — SQLite via `expo-sqlite` (or AsyncStorage for a first pass). No network.
 - **Background/reliability:** Handle reboot (reschedule alarms via `BOOT_COMPLETED`), Doze mode, and battery-optimization exemptions.
-- **Permissions:** Exact alarm permission (Android 12+), notifications (Android 13+), full-screen intent, boot-completed.
+- **Permissions:** Exact alarm (Android 12+), notifications (Android 13+), full-screen intent (Android 14+), boot-completed, wake lock, vibrate.
+
+### Expo Go is not the delivery vehicle
+Expo Go ships a fixed set of native modules and includes **none** of the three risky capabilities below. It is useful only for previewing pure-UI screens (alarm list, create/edit, math keypad). Everything that makes MathAlarm an alarm requires a development build.
 
 ### Key technical risks (build/prototype first)
 1. **Reliable firing** when app is killed + phone locked + Doze mode.
 2. **Full-screen wake screen** appearing over the lock screen.
-3. **Sound over silent mode.**
-> These three are the risky 20%. Prototype them before building polished UI.
+3. **Sound over silent mode** — no React Native audio library reliably exposes the Android ALARM stream, so this most likely needs a small custom native module. Prototype it early.
+> These three are the risky 20%. Prototype them on a development build before building polished UI.
 
 ---
 
@@ -170,6 +175,9 @@ v1 is successful when:
 - **Repeat alarms:** ✅ Day-of-week repeats supported in v1 (plus one-time alarms).
 - **Wrong answer behavior:** ✅ Generate a brand-new problem (no guess-spam).
 - **Answer types:** ✅ Integer-only in v1.
+- **Stack:** ✅ Expo (React Native + TypeScript + Expo Router) instead of Kotlin/Jetpack Compose. *(2026-08-22)*
+- **Build pipeline:** ✅ EAS Build in the cloud, not local Android builds — keeps heavy SDK/Gradle caches off a nearly full C: drive. *(2026-08-22)*
+- **On-device runtime:** ✅ A `expo-dev-client` development build, not Expo Go, because Expo Go cannot do exact alarms, full-screen intents, or alarm-stream audio. *(2026-08-22)*
 
 ### Still open (resolve during technical setup)
 - **Min SDK / target devices:** proposed floor Android 8 / API 26 — confirm when scaffolding.
