@@ -6,8 +6,13 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ title: 'Alarms' }} />
+      {/*
+        No header. The wake screen has to cover the entire window when the alarm
+        fires — a navigation bar peeking above it would be a visible seam, and
+        worse, a way to interact with the app without solving anything.
+      */}
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
       </Stack>
     </ThemeProvider>
   );
