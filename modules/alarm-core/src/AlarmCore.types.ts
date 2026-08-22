@@ -46,6 +46,18 @@ export type AlarmDismissedPayload = {
 };
 
 /**
+ * The alarm that is ringing right now. Native keeps this in device-protected
+ * storage, so it is still readable when the app was launched cold by the
+ * alarm's full-screen intent — the case where no JS event listener existed at
+ * the moment the alarm actually went off.
+ */
+export type ActiveAlarm = {
+  id: AlarmId;
+  label?: string;
+  firedAtMs: number;
+};
+
+/**
  * Android gates each of these behind a different permission with a different
  * API level and a different settings screen, so they are reported separately
  * rather than as one boolean.

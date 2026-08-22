@@ -1,6 +1,7 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
 import type {
+  ActiveAlarm,
   AlarmCoreModuleEvents,
   AlarmId,
   AlarmPermissionStatus,
@@ -34,9 +35,25 @@ declare class AlarmCoreModule extends NativeModule<AlarmCoreModuleEvents> {
    */
   dismissAlarm(id: AlarmId): Promise<void>;
 
+  /**
+   * The currently ringing alarm, or null. This is the pull-based counterpart
+   * to `onAlarmFired`: when the alarm launches the app cold, the JS context
+   * does not exist yet at fire time, so the wake screen reads this on mount
+   * rather than waiting for an event that has already been missed.
+   */
+  getActiveAlarm(): Promise<ActiveAlarm | null>;
+
   // --- Permissions --------------------------------------------------------
 
   getPermissionStatus(): Promise<AlarmPermissionStatus>;
+
+  /**
+   * The only one of these with a real in-app dialog, and the most important:
+   * on Android 13+ a suppressed notification also suppresses the full-screen
+   * intent attached to it, so without this the alarm rings with no wake screen.
+   * Resolves with the user's actual answer.
+   */
+  requestNotificationsPermission(): Promise<boolean>;
 
   /**
    * Each of these opens the relevant system settings screen; Android offers no

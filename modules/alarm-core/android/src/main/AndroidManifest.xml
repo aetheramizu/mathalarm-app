@@ -1,2 +1,62 @@
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    Declared here rather than in app.json so that every capability the module
+    needs travels with the module. The manifest merger unions these with the
+    app's own list, so duplicates are harmless.
+  -->
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+  <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+
+  <application>
+
+    <!--
+      exported=false: only AlarmManager's own PendingIntent reaches this, and a
+      PendingIntent carries the app's identity regardless of export state.
+      directBootAware so an alarm set before a reboot still fires when the
+      device restarts into a locked, pre-unlock state.
+    -->
+    <receiver
+      android:name="com.mathalarm.alarmcore.AlarmReceiver"
+      android:directBootAware="true"
+      android:enabled="true"
+      android:exported="false" />
+
+    <receiver
+      android:name="com.mathalarm.alarmcore.BootReceiver"
+      android:directBootAware="true"
+      android:enabled="true"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+        <!-- Several OEM skins (notably HTC and some Xiaomi builds) send only
+             their own vendor broadcast instead of BOOT_COMPLETED. -->
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
+
+    <!--
+      mediaPlayback is the closest-fitting foreground service type for alarm
+      audio; Android 14+ rejects an untyped service. Starting it from an exact
+      alarm broadcast is permitted because setAlarmClock grants a temporary
+      allowlist window.
+    -->
+    <service
+      android:name="com.mathalarm.alarmcore.AlarmService"
+      android:enabled="true"
+      android:exported="false"
+      android:foregroundServiceType="mediaPlayback" />
+
+  </application>
 </manifest>
