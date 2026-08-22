@@ -78,8 +78,28 @@ class AlarmService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    when (intent?.action) {
-      ACTION_START -> start(intent)
+    // Bound to a local first: `when (intent?.action)` would leave `intent`
+    // nullable inside every branch, and the branches need the intent itself.
+    val action = intent?.action
+
+    if (intent == null || action == null) {
+      // Restarted by the system with a null intent, and nothing is ringing:
+      // there is no state to rebuild, so leave rather than sit in the
+      // foreground doing nothing.
+      if (activeId == null) stopSelf()
+      return START_NOT_STICKY
+    }
+
+    when (action) {
+      ACTION_START ->
+        try {
+          start(intent)
+        } finally {
+          // Whatever happened in start(), the receiver's handoff lock has done
+          // its job by now — either this service holds its own, or it failed
+          // and is about to stop.
+          AlarmWakeLock.release()
+        }
 
       ACTION_DISMISS -> {
         val reason = intent.getStringExtra(AlarmIntents.EXTRA_REASON) ?: REASON_SOLVED
@@ -89,11 +109,7 @@ class AlarmService : Service() {
         if (target == null || target == activeId) stopRinging(reason)
       }
 
-      else -> {
-        // Null or unrecognised intent, and nothing is ringing: there is no
-        // state to rebuild, so leave rather than sit in the foreground.
-        if (activeId == null) stopSelf()
-      }
+      else -> if (activeId == null) stopSelf()
     }
 
     // Deliberately not sticky. If the system kills us mid-ring it is under
@@ -118,10 +134,18 @@ class AlarmService : Service() {
     val firedAtMs = System.currentTimeMillis()
     AlarmStore.setActive(this, ActiveAlarm(id = id, label = label, firedAtMs = firedAtMs))
 
-    goToForeground(id, label)
+    // Ring even if the foreground promotion was refused. A service the system
+    // is about to kill still makes noise for a few seconds, and noise plus an
+    // error in the log is a far better outcome than silence — the rig will
+    // report it as a `systemStopped` dismissal moments later.
+    val foregrounded = goToForeground(id, label)
     acquireWakeLock()
     startAudio()
     startVibration()
+
+    if (!foregrounded) {
+      Log.e(TAG, "Alarm $id is ringing without foreground status and will not survive")
+    }
 
     sendBroadcast(
       Intent(EVENT_FIRED)
@@ -166,18 +190,32 @@ class AlarmService : Service() {
 
   // --- Foreground notification ---------------------------------------------
 
-  private fun goToForeground(id: String, label: String?) {
-    val notification = buildNotification(id, label)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      startForeground(
-        NOTIFICATION_ID,
-        notification,
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-      )
-    } else {
-      startForeground(NOTIFICATION_ID, notification)
+  /**
+   * Returns whether the service actually reached the foreground.
+   *
+   * Android 14+ throws rather than degrading when a foreground service type is
+   * not permitted at that moment, and OEM builds vary in what they permit. An
+   * uncaught throw here would surface as "the alarm silently did nothing",
+   * which is indistinguishable from every other failure mode. Catching it costs
+   * nothing and turns a mystery into one log line.
+   */
+  private fun goToForeground(id: String, label: String?): Boolean =
+    try {
+      val notification = buildNotification(id, label)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(
+          NOTIFICATION_ID,
+          notification,
+          ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        )
+      } else {
+        startForeground(NOTIFICATION_ID, notification)
+      }
+      true
+    } catch (t: Throwable) {
+      Log.e(TAG, "startForeground rejected for alarm $id — no wake screen will appear", t)
+      false
     }
-  }
 
   private fun buildNotification(id: String, label: String?): Notification {
     ensureChannel()

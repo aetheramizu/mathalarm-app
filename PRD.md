@@ -185,5 +185,9 @@ v1 is successful when:
   - `react-native-notify-kit`, the community fork of Notifee, does cover exact alarms and full-screen intents and looks healthy, but its stated development target is RN 0.85.3 (this project is on 0.86 / SDK 57), it is effectively single-maintainer, and it still leaves alarm-stream audio unsolved.
   - Decisive factor: **alarm-stream audio requires custom Kotlin regardless of library choice.** Given that, one self-owned module covering scheduling + wake screen + audio removes a third-party dependency from the critical path of an app whose entire job is to wake the user up reliably.
 
+### Known limitations (v1)
+
+- **No direct-boot ringing.** If the device reboots and is never unlocked before an alarm's time, that alarm does not fire. Ringing pre-unlock would require a direct-boot-aware service *and* activity, and React Native cannot run in that state — so the wake screen could not appear and the alarm could not be dismissed. Alarms are re-armed at `BOOT_COMPLETED`, which arrives after first unlock. *(2026-08-23)*
+
 ### Still open (resolve during technical setup)
 - **Min SDK / target devices:** proposed floor Android 8 / API 26 — confirm when scaffolding.

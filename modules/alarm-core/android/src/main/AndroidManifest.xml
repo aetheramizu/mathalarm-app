@@ -14,30 +14,33 @@
   <uses-permission android:name="android.permission.VIBRATE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-  <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
 
   <application>
 
     <!--
+      Nothing here is directBootAware, deliberately. Ringing before first unlock
+      would need a direct-boot-aware service AND activity, and React Native
+      cannot run in that state at all — so a wake screen could never appear and
+      the alarm could never be dismissed. Claiming direct-boot support we cannot
+      honour would only turn a missed alarm into a crashed one. See the PRD's
+      known limitations.
+    -->
+
+    <!--
       exported=false: only AlarmManager's own PendingIntent reaches this, and a
       PendingIntent carries the app's identity regardless of export state.
-      directBootAware so an alarm set before a reboot still fires when the
-      device restarts into a locked, pre-unlock state.
     -->
     <receiver
       android:name="com.mathalarm.alarmcore.AlarmReceiver"
-      android:directBootAware="true"
       android:enabled="true"
       android:exported="false" />
 
     <receiver
       android:name="com.mathalarm.alarmcore.BootReceiver"
-      android:directBootAware="true"
       android:enabled="true"
       android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED" />
-        <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
         <!-- Several OEM skins (notably HTC and some Xiaomi builds) send only
              their own vendor broadcast instead of BOOT_COMPLETED. -->
         <action android:name="android.intent.action.QUICKBOOT_POWERON" />

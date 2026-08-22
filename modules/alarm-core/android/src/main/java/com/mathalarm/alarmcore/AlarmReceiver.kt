@@ -3,6 +3,7 @@ package com.mathalarm.alarmcore
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 
 /**
  * The entry point when an alarm actually goes off.
@@ -16,6 +17,11 @@ import android.content.Intent
 class AlarmReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val id = intent.getStringExtra(AlarmIntents.EXTRA_ALARM_ID) ?: return
+
+    // Taken before anything else and released by the service once it holds a
+    // lock of its own. The system's own alarm wake lock ends when this method
+    // returns, which is too early.
+    AlarmWakeLock.acquire(context)
 
     // The label in the store is authoritative; the extra is a fallback for the
     // case where the store was wiped (app data cleared) but AlarmManager still
@@ -32,6 +38,19 @@ class AlarmReceiver : BroadcastReceiver() {
       putExtra(AlarmIntents.EXTRA_ALARM_ID, id)
       putExtra(AlarmIntents.EXTRA_ALARM_LABEL, label)
     }
-    context.startForegroundService(service)
+
+    try {
+      context.startForegroundService(service)
+    } catch (t: Throwable) {
+      // If the service never starts it can never release the handoff lock, so
+      // that has to happen here instead. The alarm is already lost at this
+      // point; the log line is the only thing that explains why.
+      AlarmWakeLock.release()
+      Log.e(TAG, "Could not start AlarmService — alarm $id will not ring", t)
+    }
+  }
+
+  private companion object {
+    const val TAG = "AlarmReceiver"
   }
 }

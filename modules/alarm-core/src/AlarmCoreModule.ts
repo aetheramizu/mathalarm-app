@@ -24,7 +24,14 @@ declare class AlarmCoreModule extends NativeModule<AlarmCoreModuleEvents> {
   /** Cancels a pending alarm. Cancelling an unknown id is a no-op, not an error. */
   cancelAlarm(id: AlarmId): Promise<void>;
 
-  /** Ids currently pending in AlarmManager. Used to reconcile after a reboot. */
+  /**
+   * Ids the native side believes are armed, used to reconcile after a reboot.
+   *
+   * This is native's own record, not a query of AlarmManager — Android exposes
+   * no way to enumerate pending alarms. The two can therefore drift if the
+   * system drops an alarm without telling us, so treat this as the best
+   * available answer rather than ground truth.
+   */
   getScheduledAlarmIds(): Promise<AlarmId[]>;
 
   // --- Wake screen / audio ------------------------------------------------

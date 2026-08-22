@@ -25,10 +25,11 @@ internal data class ActiveAlarm(
  * can answer two questions without a running JS context: "what should I put
  * back after a reboot?" and "what is ringing?".
  *
- * It deliberately uses device-protected storage. A `LOCKED_BOOT_COMPLETED`
- * receiver runs before the user has unlocked the device for the first time,
- * and credential-encrypted storage — where SharedPreferences normally lives —
- * is simply not readable at that point.
+ * It uses device-protected storage, which is readable regardless of whether the
+ * device has been unlocked since boot. v1 does not attempt to ring before first
+ * unlock — React Native cannot run in direct boot, so there would be no way to
+ * dismiss such an alarm — but storing here anyway makes the store independent
+ * of unlock timing, and costs nothing to do.
  */
 internal object AlarmStore {
   private const val PREFS_NAME = "alarm-core"
