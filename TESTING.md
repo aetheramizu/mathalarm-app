@@ -55,11 +55,13 @@ confirm the wake-up is listed with the outcome named.
 | 24 | Three-button navigation | Switch the phone to three-button navigation and repeat #23 | The tab bar sits directly above the button row, not underneath it; no scrim or grey band between them; buttons are light on the void |
 | 25 | Immersive challenge | Let an alarm fire on both navigation modes | Status bar and navigation bar are gone for the whole challenge; the equation and keypad clear the camera cutout; a swipe from an edge may reveal the bars transiently, and back still does nothing; solving restores both bars for the rest of the app |
 | 26 | Time wheels | Open an existing alarm, fling both wheels, edit a second alarm | Each wheel opens already centred on the alarm's own time, never scrolling up to it; flings snap cleanly to a row; the centred value is the one saved; ticks are felt but not machine-gunned |
+| 27 | Wake feedback | Answer one problem right, then one wrong | Right: a success buzz, a filled segment, the next equation fades in from below; wrong: an error buzz, the answer field flashes red and shakes once, and the line beneath says a new problem is up. Neither outcome is identifiable by colour alone |
+| 28 | Reduced motion | Turn on Android's "Remove animations", then fire an alarm | The ringing dot, the equation swap, the shake and the caret blink all stop; every one of them lands on its finished state, nothing is invisible or stuck mid-transition, and the challenge is still fully solvable |
 
 ## What a failure means
 
 - **Rows 1–8, 12–15** are the product. A failure here blocks v1.
-- **Rows 9–11, 16–26** are correctness around it. A failure is a bug to fix
+- **Rows 9–11, 16–28** are correctness around it. A failure is a bug to fix
   before daily use, not necessarily before the next build.
 - **Row 18** is the one where the honest answer may be "this OEM is hostile".
   `PRD.md` §13 accepts that; the battery-optimisation exemption is the mitigation

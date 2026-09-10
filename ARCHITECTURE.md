@@ -30,7 +30,7 @@ D:\AppDev\MathAlarm
    │  └─ wake.tsx                       # full-screen challenge — OUTSIDE (tabs)
    ├─ design/                           # tokens.ts, typography.ts, fonts.ts
    ├─ ui/                               # dumb presentational components
-   │                                    # Button, Card, Chip, Toggle, Keypad, StepDots, Sheet
+   │                                    # Button, Card, Chip, Toggle, Keypad, Sheet, reduced-motion hook
    ├─ features/                         # screen-level React: components + hooks
    │  ├─ alarms/    AlarmCard, AlarmForm, TimePicker, useAlarms
    │  ├─ wake/      WakeChallenge, machine.ts, useWakeMachine
