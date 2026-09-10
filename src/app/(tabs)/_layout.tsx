@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
-import { Color, Space } from '@/design/tokens';
+import { Color, Layout, Space } from '@/design/tokens';
 import { FontFamily } from '@/design/typography';
 
 /**
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     backgroundColor: Color.void,
     borderTopColor: Color.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    height: 68,
+    height: Layout.tabBar,
     paddingTop: Space.xs,
   },
   label: {

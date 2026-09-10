@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import * as settingsRepo from '@/data/repositories/settings';
 import { Color, Space } from '@/design/tokens';
@@ -29,6 +30,9 @@ const PERMISSION_ORDER: PermissionKey[] = [
  */
 export default function OnboardingScreen() {
   const { status, request } = usePermissions();
+  // There is no tab bar under this screen to absorb the gesture area, so the
+  // footer has to clear it itself.
+  const insets = useSafeAreaInsets();
   const blocked = alarmsAreBlocked(status);
 
   const finish = () => {
@@ -68,7 +72,7 @@ export default function OnboardingScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Space.md) }]}>
         {blocked ? (
           <SecondaryButton label="Continue anyway" onPress={finish} />
         ) : (

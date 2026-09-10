@@ -11,7 +11,7 @@ import { Type } from '@/design/typography';
 import { PermissionRow } from '@/features/settings/PermissionRow';
 import { usePermissions } from '@/features/settings/usePermissions';
 import { Card } from '@/ui/card';
-import { Screen } from '@/ui/screen';
+import { Screen, useTabContentInset } from '@/ui/screen';
 import { alarmsAreBlocked, type PermissionKey } from '@/services/permissions';
 
 const PERMISSION_ORDER: PermissionKey[] = [
@@ -34,6 +34,7 @@ const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 export default function SettingsScreen() {
   const { status, request } = usePermissions();
   const [defaultDifficulty, setDefaultDifficulty] = useState<Difficulty>('medium');
+  const bottomInset = useTabContentInset();
 
   useFocusEffect(
     useCallback(() => {
@@ -50,7 +51,9 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
+        showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={Type.labelSm}>MATHALARM</Text>
           <Text style={Type.headlineLg}>Settings</Text>
@@ -151,7 +154,6 @@ function Section({
 const styles = StyleSheet.create({
   content: {
     paddingTop: Space.xl,
-    paddingBottom: Space.xxxl * 2,
     gap: Space.xl,
   },
   header: {

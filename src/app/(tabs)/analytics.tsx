@@ -10,7 +10,7 @@ import { SessionRow } from '@/features/analytics/SessionRow';
 import { formatCount, formatDuration, formatPercent, formatSeconds } from '@/features/analytics/format';
 import { useAnalytics } from '@/features/analytics/useAnalytics';
 import { Card } from '@/ui/card';
-import { Screen } from '@/ui/screen';
+import { Screen, useTabContentInset } from '@/ui/screen';
 
 /**
  * Wake history, and only wake history.
@@ -24,11 +24,14 @@ export default function AnalyticsScreen() {
   const { summary, recent, loading } = useAnalytics();
   // Named `range` rather than `window` so it cannot be confused with the global.
   const [range, setRange] = useState<'last7' | 'last30'>('last7');
+  const bottomInset = useTabContentInset();
 
   if (!summary || summary.totalSessions === 0) {
     return (
       <Screen>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
+          showsVerticalScrollIndicator={false}>
           <Header />
           {loading ? null : <EmptyState />}
         </ScrollView>
@@ -40,7 +43,9 @@ export default function AnalyticsScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
+        showsVerticalScrollIndicator={false}>
         <Header />
 
         <Card style={styles.streak}>
@@ -184,7 +189,6 @@ function EmptyState() {
 const styles = StyleSheet.create({
   content: {
     paddingTop: Space.xl,
-    paddingBottom: Space.xxxl * 2,
     gap: Space.md,
   },
   header: {

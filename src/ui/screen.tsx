@@ -41,3 +41,15 @@ const styles = StyleSheet.create({
     backgroundColor: Color.void,
   },
 });
+
+/**
+ * How much room a scrolling tab screen has to leave at the bottom.
+ *
+ * The tab bar floats over the content, and on a gesture-navigation phone the
+ * system inset sits under it again, so a fixed padding that looks right on one
+ * device buries the last row on another.
+ */
+export function useTabContentInset(): number {
+  const insets = useSafeAreaInsets();
+  return insets.bottom + Layout.tabBar + Layout.screenPadding;
+}

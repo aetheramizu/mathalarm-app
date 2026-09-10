@@ -76,4 +76,10 @@ export const Layout = {
    * larger than the platform minimum.
    */
   wakeKey: 64,
+  /**
+   * The tab bar's own height, excluding the gesture inset below it. Screens add
+   * this plus that inset to their scroll padding so the last row is never
+   * trapped underneath the bar.
+   */
+  tabBar: 68,
 } as const;

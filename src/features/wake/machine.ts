@@ -51,6 +51,8 @@ export type WakeState =
 export type WakeEvent =
   | { type: 'no_alarm' }
   | { type: 'resumed'; progress: WakeProgress }
+  /** A different alarm is now ringing — throw this challenge away and resolve again. */
+  | { type: 'restart' }
   | { type: 'digit'; digit: number }
   /** Remove the last digit typed. */
   | { type: 'backspace' }
@@ -71,6 +73,11 @@ export function reduce(state: WakeState, event: WakeEvent): WakeState {
   // at any moment, and there is no state in which continuing would be right.
   if (event.type === 'closed') return { phase: 'closed', outcome: event.outcome };
   if (event.type === 'no_alarm') return { phase: 'closed', outcome: 'no_alarm' };
+
+  // Deliberately allowed from `dismissing` as well as `solving`: a second alarm
+  // can start ringing while the first one's dismissal is still in flight, and
+  // the screen has to end up on whatever is actually making noise.
+  if (event.type === 'restart') return { phase: 'resolving' };
 
   if (event.type === 'resumed') {
     // Only ever entered from `resolving`. Re-entering it later would restart a

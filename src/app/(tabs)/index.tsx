@@ -15,7 +15,7 @@ import { usePermissions } from '@/features/settings/usePermissions';
 import { alarmsAreBlocked } from '@/services/permissions';
 import { PrimaryButton } from '@/ui/button';
 import { Card } from '@/ui/card';
-import { Screen } from '@/ui/screen';
+import { Screen, useTabContentInset } from '@/ui/screen';
 
 /**
  * The home screen: every alarm, and the one way to make another.
@@ -28,6 +28,7 @@ import { Screen } from '@/ui/screen';
 export default function AlarmsScreen() {
   const { alarms, loading, now, create, update, setEnabled, remove } = useAlarms();
   const { status: permissions, loading: permissionsLoading } = usePermissions();
+  const bottomInset = useTabContentInset();
   const [editing, setEditing] = useState<Alarm | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [defaultDifficulty, setDefaultDifficulty] = useState<Difficulty>('medium');
@@ -57,7 +58,7 @@ export default function AlarmsScreen() {
       <FlatList
         data={alarms}
         keyExtractor={(alarm) => alarm.id}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.header}>
@@ -159,8 +160,6 @@ function EmptyState() {
 const styles = StyleSheet.create({
   content: {
     paddingTop: Space.xl,
-    // Clears the tab bar, which floats over the list.
-    paddingBottom: Space.xxxl * 2,
   },
   header: {
     gap: Space.md,

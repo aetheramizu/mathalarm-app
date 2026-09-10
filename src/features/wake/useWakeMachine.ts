@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { AppState, BackHandler } from 'react-native';
 
 import * as wakeSession from '@/services/wake-session';
@@ -21,6 +21,8 @@ export function useWakeMachine(): {
   abortForDevelopment: () => void;
 } {
   const [state, dispatch] = useReducer(reduce, initialState);
+  // Bumped to re-run resolution when a different alarm takes over the device.
+  const [resolveNonce, setResolveNonce] = useState(0);
 
   // The reducer's state, readable from callbacks and listeners that were
   // created before it changed.
@@ -52,6 +54,31 @@ export function useWakeMachine(): {
     return () => {
       cancelled = true;
     };
+  }, [resolveNonce]);
+
+  // --- A second alarm -------------------------------------------------------
+
+  /**
+   * Two alarms a minute apart, the first still unsolved: native moves on to the
+   * second, so the screen has to as well. The first session is closed as
+   * `system_stopped`, which is exactly what happened to it, and resolution runs
+   * again against whatever is ringing now.
+   */
+  useEffect(() => {
+    const subscription = wakeSession.subscribeToAlarmFired(({ id }) => {
+      const state = current.current;
+      if (state.phase !== 'solving' && state.phase !== 'dismissing') return;
+      if (state.progress.alarmId === id) return;
+
+      const { sessionId } = state.progress;
+      dispatch({ type: 'restart' });
+      void wakeSession
+        .closeFromNative(sessionId, 'systemStopped')
+        .catch(() => {})
+        .finally(() => setResolveNonce((nonce) => nonce + 1));
+    });
+
+    return () => subscription.remove();
   }, []);
 
   // --- Native teardown ------------------------------------------------------
@@ -109,7 +136,14 @@ export function useWakeMachine(): {
   // --- Dismissal ------------------------------------------------------------
 
   useEffect(() => {
-    if (state.phase !== 'dismissing' || dismissing.current) return;
+    if (state.phase !== 'dismissing') {
+      // Reset on the way out, so a challenge that returns here — a second alarm
+      // arriving mid-dismissal sends the screen back through `resolving` — is
+      // not silently skipped by the guard below.
+      dismissing.current = false;
+      return;
+    }
+    if (dismissing.current) return;
     dismissing.current = true;
 
     void wakeSession

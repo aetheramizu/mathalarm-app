@@ -62,8 +62,24 @@ export async function armAlarm(alarm: Alarm, now = new Date()): Promise<number |
 
 /** Cancels any armed occurrence and clears the cached trigger time. */
 export async function disarmAlarm(id: string): Promise<void> {
-  await AlarmCore.cancelAlarm(id);
+  await cancel(id);
   await alarmsRepo.setNextTriggerAt(id, null);
+}
+
+/**
+ * Cancelling never throws upwards.
+ *
+ * A failed cancel leaves the kernel holding an occurrence the database no
+ * longer claims, which is precisely the orphan reconciliation sweeps up on the
+ * next pass. Letting it propagate would instead abort whatever the user was
+ * doing — disabling an alarm, or deleting one.
+ */
+async function cancel(id: string): Promise<void> {
+  try {
+    await AlarmCore.cancelAlarm(id);
+  } catch (error) {
+    console.warn(`[alarm-scheduler] could not cancel ${id}`, error);
+  }
 }
 
 // --- Mutations --------------------------------------------------------------
@@ -74,7 +90,7 @@ export async function disarmAlarm(id: string): Promise<void> {
 
 export async function createAlarm(input: NewAlarm): Promise<Alarm> {
   const alarm = await alarmsRepo.create(input);
-  await armAlarm(alarm);
+  await tryArm(alarm);
   return (await alarmsRepo.getById(alarm.id)) ?? alarm;
 }
 
@@ -82,8 +98,25 @@ export async function updateAlarm(id: string, patch: AlarmPatch): Promise<void> 
   await alarmsRepo.update(id, patch);
   const alarm = await alarmsRepo.getById(id);
   if (!alarm) return;
-  if (alarm.enabled) await armAlarm(alarm);
+  if (alarm.enabled) await tryArm(alarm);
   else await disarmAlarm(id);
+}
+
+/**
+ * Arms an alarm without letting a kernel failure undo the user's edit.
+ *
+ * A revoked exact-alarm permission is the realistic cause, and it must not look
+ * like the save failed: the alarm is real and stored, it simply has no armed
+ * occurrence. `armAlarm` has already cleared `next_trigger_at`, which is
+ * exactly what the list renders as "Not scheduled", and the permission banner
+ * above it says why.
+ */
+async function tryArm(alarm: Alarm, now?: Date): Promise<void> {
+  try {
+    await armAlarm(alarm, now ?? new Date());
+  } catch (error) {
+    console.warn(`[alarm-scheduler] saved ${alarm.id} but could not arm it`, error);
+  }
 }
 
 export async function setAlarmEnabled(id: string, enabled: boolean): Promise<void> {
@@ -92,9 +125,9 @@ export async function setAlarmEnabled(id: string, enabled: boolean): Promise<voi
 
 export async function deleteAlarm(id: string): Promise<void> {
   // Cancelled first: a deleted row can no longer be found by reconciliation, so
-  // an occurrence left armed here would only be cleaned up by the sweep of
-  // orphaned ids — and would ring in the meantime.
-  await AlarmCore.cancelAlarm(id);
+  // an occurrence left armed here would ring with nothing behind it until the
+  // next sweep of orphaned ids picks it up.
+  await cancel(id);
   await alarmsRepo.remove(id);
 }
 
@@ -162,21 +195,18 @@ async function runReconcile(): Promise<void> {
     // moved on, so the comparison above already catches it.
     if (armed) continue;
 
-    try {
-      await armAlarm(alarm, now);
-    } catch (error) {
-      // One alarm failing to arm must not abandon the rest of the pass. The
-      // row is left with a null trigger time by `armAlarm`, which is what the
-      // list renders as unarmed.
-      console.warn(`[alarm-scheduler] could not arm ${alarm.id}`, error);
-    }
+    // One alarm failing to arm must not abandon the rest of the pass; the row
+    // is left with a null trigger time, which the list renders as unarmed.
+    // The pass's own `now` is reused so the armed occurrence is the one the
+    // comparison above expected, even if the clock has ticked past a minute.
+    await tryArm(alarm, now);
   }
 
   // Anything the kernel holds that no enabled alarm claims: a deleted alarm, a
   // disabled one, or a leftover from an older build.
   const claimed = new Set(alarms.filter((alarm) => alarm.enabled).map((alarm) => alarm.id));
   for (const id of scheduled) {
-    if (!claimed.has(id)) await AlarmCore.cancelAlarm(id);
+    if (!claimed.has(id)) await cancel(id);
   }
 
   await sweepStaleSessions(now.getTime());

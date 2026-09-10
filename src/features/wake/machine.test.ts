@@ -67,6 +67,25 @@ describe('resolving', () => {
   });
 });
 
+describe('a second alarm during a challenge', () => {
+  it('drops back to resolving from solving', () => {
+    assert.deepEqual(reduce(solving({ stepIndex: 2 }), { type: 'restart' }), {
+      phase: 'resolving',
+    });
+  });
+
+  it('drops back to resolving from dismissing', () => {
+    const dismissing = reduce(solving({ stepIndex: 2 }), { type: 'complete', at: 1 });
+    assert.deepEqual(reduce(dismissing, { type: 'restart' }), { phase: 'resolving' });
+  });
+
+  it('can then resume onto the new alarm', () => {
+    const restarted = reduce(solving({ stepIndex: 2 }), { type: 'restart' });
+    const next = reduce(restarted, { type: 'resumed', progress: progress({ alarmId: 'a2' }) });
+    assert.equal(next.phase === 'solving' ? next.progress.alarmId : null, 'a2');
+  });
+});
+
 describe('entry', () => {
   it('appends digits', () => {
     let state = solving();

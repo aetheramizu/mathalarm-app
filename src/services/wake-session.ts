@@ -1,5 +1,9 @@
 import AlarmCore from '../../modules/alarm-core';
-import type { AlarmDismissedPayload, DismissReason } from '../../modules/alarm-core';
+import type {
+  AlarmDismissedPayload,
+  AlarmFiredPayload,
+  DismissReason,
+} from '../../modules/alarm-core';
 
 import type { WakeSessionOutcome } from '@/data/models';
 import * as activeChallenge from '@/data/repositories/activeChallenge';
@@ -33,7 +37,9 @@ export async function ringingAlarmId(): Promise<string | null> {
 }
 
 /** An alarm going off while the app is already open and on screen. */
-export function subscribeToAlarmFired(handler: () => void): { remove: () => void } {
+export function subscribeToAlarmFired(
+  handler: (payload: AlarmFiredPayload) => void
+): { remove: () => void } {
   return AlarmCore.addListener('onAlarmFired', handler);
 }
 
