@@ -41,6 +41,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "test": "tsc -p tsconfig.test.json && node --test .test-build",
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
     "start:lan": "expo start --host lan",

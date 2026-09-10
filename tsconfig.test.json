@@ -1,0 +1,16 @@
+{
+  "//": "Domain tests only. `domain/` is pure TypeScript with no React, no native module and no SQLite behind it, so it compiles to plain CommonJS and runs under `node --test` on the host — no device, no Metro, and no test framework dependency.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "rootDir": "src",
+    "outDir": ".test-build",
+    "noEmitOnError": true
+  },
+  "include": ["src/domain/**/*.ts"]
+}

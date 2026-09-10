@@ -11,6 +11,11 @@
       ]
     }
   },
+  "//": "Host-only domain tests are excluded: they import `node:test`, which has no place in the React Native bundle. They are typechecked by tsconfig.test.json instead.",
+  "exclude": [
+    "**/*.test.ts",
+    ".test-build"
+  ],
   "include": [
     "**/*.ts",
     "**/*.tsx",

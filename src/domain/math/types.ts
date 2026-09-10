@@ -24,3 +24,10 @@ export type Problem = {
   kind: ProblemKind;
   difficulty: Difficulty;
 };
+
+/**
+ * The only source of randomness the generator uses, injected so a test can
+ * hand it a seeded sequence and get reproducible problems. Same contract as
+ * `Math.random`: a float in [0, 1).
+ */
+export type RNG = () => number;

@@ -46,3 +46,6 @@ example
 
 # Claude Code local settings
 .claude/
+
+# domain test build output
+.test-build/
