@@ -3,10 +3,12 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { fontAssets } from '@/design/fonts';
 import { Color } from '@/design/tokens';
+import { reconcile } from '@/services/alarm-scheduler';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,6 +31,8 @@ const AppTheme = {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
+
+  useReconciliation();
 
   useEffect(() => {
     // A missing font file must not leave the user staring at a splash screen
@@ -60,4 +64,33 @@ export default function RootLayout() {
       </ThemeProvider>
     </SafeAreaProvider>
   );
+}
+
+/**
+ * Keeps the kernel and the database in step for as long as the app is alive.
+ *
+ * Once on cold start, and again on every return to the foreground — the app can
+ * be backgrounded for days, cross a DST boundary, or come back from a system
+ * settings screen where the user just granted or revoked the exact-alarm
+ * permission, and in each case what is armed may no longer match what the
+ * database says should be.
+ *
+ * Reconciliation opens the database itself, so it deliberately does not wait on
+ * fonts: an alarm being armed correctly must not depend on a typeface loading.
+ */
+function useReconciliation() {
+  useEffect(() => {
+    const run = () => {
+      void reconcile().catch((error) => {
+        console.warn('[MathAlarm] reconciliation failed', error);
+      });
+    };
+
+    run();
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') run();
+    });
+    return () => subscription.remove();
+  }, []);
 }
