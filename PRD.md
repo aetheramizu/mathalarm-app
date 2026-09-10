@@ -109,7 +109,7 @@ v1 has **three** top-level sections, in a bottom tab bar:
 
 ### 6.2 Setting an alarm
 1. From Alarms, tap the primary "New alarm" action.
-2. A sheet opens: time entered on a large numeric keypad (HH:MM, no wheel or dial), label, repeat days, difficulty. Difficulty is pre-filled from `settings.default_difficulty`.
+2. A sheet opens: time entered on scrolling hour and minute wheels (HH:MM, 24-hour), label, repeat days, difficulty. Difficulty is pre-filled from `settings.default_difficulty`.
 3. Save → the alarm appears in the list, enabled, and is armed with the native kernel.
 4. The list shows the time until the next alarm fires.
 
@@ -324,7 +324,7 @@ P2 has no dependencies and can be built at any point before P5.
 - **Design status:** ✅ The Stitch "Cyber Chrono" prototype is a visual reference, not a product specification, and is adapted for native rather than ported. *(2026-09-10)*
 - **Priority:** ✅ Functionality over visual polish, as a product and engineering constraint. *(2026-09-10)*
 - **Charts:** ✅ No `react-native-svg` in v1; progress and simple bars are built from plain views. *(2026-09-10)*
-- **Time input:** ✅ A touch-friendly numeric keypad for HH:MM. No wheel picker and no dial, and not a reproduction of the Stitch web control. *(2026-09-10)*
+- **Time input:** ✅ Scrolling hour and minute wheels for HH:MM, 24-hour, with the selected value centred and its neighbours dimmed. Revised from the original numeric keypad: the keypad was unambiguous but cost four deliberate taps and read as a form field, while a wheel is the control every alarm on the platform uses. Only real hours and minutes exist on the wheels, so an invalid time still cannot be entered, and each wheel is an accessibility adjustable so a screen reader never has to perform a drag. Still not a reproduction of the Stitch web control. *(2026-09-11)*
 - **Difficulty inheritance:** ✅ Difficulty is stored per alarm and is what that alarm uses when it fires. `settings.default_difficulty` is inherited only at creation time and never rewrites existing alarms. *(2026-09-10)*
 - **Streak:** ✅ Kept as a derived analytics metric computed from solved wake sessions. Historical data only — no XP, levels, badges, rewards, or leaderboards. *(2026-09-10)*
 - **Per-question persistence:** ✅ Aggregate timing only in v1; the data layer is structured so a `question_attempts` table is a purely additive change. *(2026-09-10)*

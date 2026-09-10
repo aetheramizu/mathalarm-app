@@ -32,7 +32,7 @@ D:\AppDev\MathAlarm
    ├─ ui/                               # dumb presentational components
    │                                    # Button, Card, Chip, Toggle, Keypad, StepDots, Sheet
    ├─ features/                         # screen-level React: components + hooks
-   │  ├─ alarms/    AlarmCard, AlarmForm, TimeKeypad, useAlarms
+   │  ├─ alarms/    AlarmCard, AlarmForm, TimePicker, useAlarms
    │  ├─ wake/      WakeChallenge, machine.ts, useWakeMachine
    │  ├─ analytics/ useAnalytics, SessionRow, StatTile
    │  └─ settings/  PermissionRow, usePermissions
@@ -468,7 +468,7 @@ data only: no XP, levels, badges, rewards, or leaderboards.
 | **P1 Data layer** | Schema, migrations, four repositories, models | P0 | Repository tests; database inspected on device |
 | **P2 Math engine** | Generator for three tiers, `REQUIRED_PROBLEMS`, seeded-RNG tests | — (any time before P5) | Unit tests, no device needed |
 | **P3 Scheduling service** | `nextOccurrence`, arm/cancel, `reconcile()`, dismissal rescheduling | P1 | Occurrence unit tests; armed ids match the database on device |
-| **P4 Alarms UI** | List, empty state, next-alarm summary, create/edit sheet with the numeric time keypad, toggle, swipe-delete with undo | P0, P1, P3 | Create an alarm, kill the app, reopen — it persists and stays armed |
+| **P4 Alarms UI** | List, empty state, next-alarm summary, create/edit sheet with the scrolling time wheels, toggle, swipe-delete with undo | P0, P1, P3 | Create an alarm, kill the app, reopen — it persists and stays armed |
 | **P5 Wake screen** | Full-screen route, keypad, step dots, the §5 machine, session recording, dismissal | P2, P3 | Alarm fires locked → solve → silence → session row written |
 | **P6 Permissions & Settings** | Onboarding gate, Settings health panel, `default_difficulty` | P0, P1 | Each permission toggled in system settings is reflected on return |
 | **P7 Analytics** | Session list and the §10 aggregates | P1, P5 | Numbers hand-checked against the session rows |

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Alarm } from '@/data/models';
@@ -11,7 +11,7 @@ import { DangerButton, PrimaryButton } from '@/ui/button';
 import { Sheet } from '@/ui/sheet';
 
 import { DAY_PICKER, formatRepeat } from './format';
-import { TimeKeypad, digitsToTime, timeToDigits, type TimeDigits } from './TimeKeypad';
+import { TimePicker } from './TimePicker';
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const LABEL_MAX = 40;
@@ -46,27 +46,35 @@ export function AlarmForm({
   onSave,
   onDelete,
 }: Props) {
-  const [digits, setDigits] = useState<TimeDigits>('');
+  const [time, setTime] = useState(defaultTime);
   const [label, setLabel] = useState('');
   const [repeatDays, setRepeatDays] = useState(0);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaultDifficulty);
   const [saving, setSaving] = useState(false);
+  const [wasVisible, setWasVisible] = useState(visible);
 
-  // Reset when the sheet opens, not when it closes: the fields would otherwise
-  // visibly blank out during the closing animation.
-  useEffect(() => {
-    if (!visible) return;
-    setDigits(alarm ? timeToDigits(alarm.hour, alarm.minute) : defaultTime());
-    setLabel(alarm?.label ?? '');
-    setRepeatDays(alarm?.repeatDays ?? 0);
-    setDifficulty(alarm?.difficulty ?? defaultDifficulty);
-    setSaving(false);
-  }, [visible, alarm, defaultDifficulty]);
-
-  const time = digitsToTime(digits);
+  /**
+   * Reset when the sheet opens, not when it closes: the fields would otherwise
+   * visibly blank out during the closing animation.
+   *
+   * Done during render rather than in an effect, because the time wheels read
+   * their scroll position once, when they mount. An effect runs *after* that
+   * first render, so the wheels would have already been seeded from the alarm
+   * edited before this one and would sit on the wrong hour.
+   */
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setTime(alarm ? { hour: alarm.hour, minute: alarm.minute } : defaultTime());
+      setLabel(alarm?.label ?? '');
+      setRepeatDays(alarm?.repeatDays ?? 0);
+      setDifficulty(alarm?.difficulty ?? defaultDifficulty);
+      setSaving(false);
+    }
+  }
 
   const save = async () => {
-    if (!time || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
       await onSave({
@@ -117,13 +125,22 @@ export function AlarmForm({
             label={saving ? 'Saving…' : 'Save alarm'}
             icon="check"
             onPress={save}
-            disabled={!time || saving}
-            accessibilityHint={time ? undefined : 'Enter a four-digit time first'}
+            disabled={saving}
           />
           {alarm ? <DangerButton label="Delete alarm" icon="delete-outline" onPress={confirmDelete} /> : null}
         </>
       }>
-      <TimeKeypad digits={digits} onChange={setDigits} />
+      {/*
+        Keyed on which alarm the sheet is showing, so the wheels are remounted —
+        and therefore re-seeded — whenever the subject changes, rather than
+        depending on the modal happening to unmount its children when it closes.
+      */}
+      <TimePicker
+        key={alarm?.id ?? 'new'}
+        hour={time.hour}
+        minute={time.minute}
+        onChange={setTime}
+      />
 
       <Field label="LABEL">
         <TextInput
@@ -217,9 +234,9 @@ function Field({
 }
 
 /** A new alarm opens on the next round hour, which is usually close to right. */
-function defaultTime(): TimeDigits {
+function defaultTime(): { hour: number; minute: number } {
   const next = new Date(Date.now() + 60 * 60 * 1000);
-  return timeToDigits(next.getHours(), 0);
+  return { hour: next.getHours(), minute: 0 };
 }
 
 const styles = StyleSheet.create({
