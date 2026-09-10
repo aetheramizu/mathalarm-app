@@ -45,9 +45,12 @@ const styles = StyleSheet.create({
 /**
  * How much room a scrolling tab screen has to leave at the bottom.
  *
- * The tab bar floats over the content, and on a gesture-navigation phone the
- * system inset sits under it again, so a fixed padding that looks right on one
- * device buries the last row on another.
+ * The tab bar floats over the content, and Android draws the whole window
+ * under the gesture pill or the three-button bar, so the strip the system
+ * claims has to be counted as well as the bar itself. This mirrors the height
+ * `(tabs)/_layout` gives the bar — `tabBar` plus the same bottom inset — and
+ * adds one gutter on top, so the last row clears the bar by the same margin on
+ * a gesture phone and a three-button one.
  */
 export function useTabContentInset(): number {
   const insets = useSafeAreaInsets();

@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mathalarm",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#09090E",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -50,6 +51,13 @@
           "android": {
             "minSdkVersion": 26
           }
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "style": "light",
+          "enforceContrast": false
         }
       ],
       "./modules/alarm-core/app.plugin.js",

@@ -51,11 +51,14 @@ confirm the wake-up is listed with the outcome named.
 | 20 | DST | Set the device date to a spring-forward day with a daily alarm | Fires at the same wall-clock time; a 02:30 alarm rolls to 03:30 rather than being skipped |
 | 21 | Analytics accuracy | After several sessions, hand-check the numbers | Counts, accuracy and streak match the rows in Recent wake-ups; nothing shows `0%` where there is no data |
 | 22 | Empty states | Fresh install | Alarms and Analytics both show their empty state, not a dashboard of zeros |
+| 23 | Gesture navigation | Set the phone to gesture navigation; visit all three tabs and scroll each to the bottom | Tab labels sit clear of the gesture pill; the last row of every list is fully readable above the tab bar; the strip behind the pill is the same void as the bar, with no lighter band |
+| 24 | Three-button navigation | Switch the phone to three-button navigation and repeat #23 | The tab bar sits directly above the button row, not underneath it; no scrim or grey band between them; buttons are light on the void |
+| 25 | Immersive challenge | Let an alarm fire on both navigation modes | Status bar and navigation bar are gone for the whole challenge; the equation and keypad clear the camera cutout; a swipe from an edge may reveal the bars transiently, and back still does nothing; solving restores both bars for the rest of the app |
 
 ## What a failure means
 
 - **Rows 1–8, 12–15** are the product. A failure here blocks v1.
-- **Rows 9–11, 16–22** are correctness around it. A failure is a bug to fix
+- **Rows 9–11, 16–25** are correctness around it. A failure is a bug to fix
   before daily use, not necessarily before the next build.
 - **Row 18** is the one where the honest answer may be "this OEM is hostile".
   `PRD.md` §13 accepts that; the battery-optimisation exemption is the mitigation

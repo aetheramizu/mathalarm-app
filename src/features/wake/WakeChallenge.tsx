@@ -56,7 +56,15 @@ export function WakeChallenge({
     <View
       style={[
         styles.root,
-        { paddingTop: insets.top + Space.lg, paddingBottom: Math.max(insets.bottom, Space.md) },
+        // The route runs immersive, so both insets read 0 once Android has
+        // hidden the bars — but a punch-hole camera and a gesture pill are
+        // still physically there. `Math.max` keeps a floor under both edges so
+        // the label never lands behind a cutout and the keypad never sits on
+        // the very lip of the display.
+        {
+          paddingTop: Math.max(insets.top, Space.lg) + Space.lg,
+          paddingBottom: Math.max(insets.bottom, Space.md),
+        },
       ]}>
       <Pressable
         // The only escape hatch, and it exists solely so a development build can
