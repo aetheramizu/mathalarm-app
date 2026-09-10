@@ -1,17 +1,20 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Alarm } from '@/data/models';
 import * as settingsRepo from '@/data/repositories/settings';
 import type { Difficulty } from '@/domain/math/types';
-import { Color, Space } from '@/design/tokens';
+import { Color, Layout, Radius, Space } from '@/design/tokens';
 import { Type } from '@/design/typography';
 import { AlarmCard, NextAlarmSummary } from '@/features/alarms/AlarmCard';
 import { AlarmForm } from '@/features/alarms/AlarmForm';
 import { useAlarms } from '@/features/alarms/useAlarms';
+import { usePermissions } from '@/features/settings/usePermissions';
+import { alarmsAreBlocked } from '@/services/permissions';
 import { PrimaryButton } from '@/ui/button';
+import { Card } from '@/ui/card';
 import { Screen } from '@/ui/screen';
 
 /**
@@ -24,6 +27,7 @@ import { Screen } from '@/ui/screen';
  */
 export default function AlarmsScreen() {
   const { alarms, loading, now, create, update, setEnabled, remove } = useAlarms();
+  const { status: permissions, loading: permissionsLoading } = usePermissions();
   const [editing, setEditing] = useState<Alarm | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [defaultDifficulty, setDefaultDifficulty] = useState<Difficulty>('medium');
@@ -59,6 +63,8 @@ export default function AlarmsScreen() {
           <View style={styles.header}>
             <Text style={Type.labelSm}>MATHALARM</Text>
             <Text style={Type.headlineLg}>Alarms</Text>
+
+            {!permissionsLoading && alarmsAreBlocked(permissions) ? <PermissionBanner /> : null}
 
             {next ? <NextAlarmSummary alarm={next} now={now} /> : null}
 
@@ -105,6 +111,38 @@ export default function AlarmsScreen() {
   );
 }
 
+/**
+ * The one warning that outranks everything else on this screen.
+ *
+ * Without exact alarms or notifications an alarm simply does not ring, and a
+ * list of alarms that all look armed would be actively misleading. It links to
+ * Settings rather than requesting inline, because the fix is on a system screen
+ * and the panel there explains each permission.
+ */
+function PermissionBanner() {
+  return (
+    <Card style={styles.banner}>
+      <View style={styles.bannerHead}>
+        <MaterialIcons name="error-outline" size={20} color={Color.danger} />
+        <Text style={[Type.titleLg, styles.bannerTitle]}>Alarms may not ring</Text>
+      </View>
+      <Text style={Type.bodySm}>
+        A permission Android requires for alarms is missing. Open Settings to see which one and fix
+        it.
+      </Text>
+      <Pressable
+        onPress={() => router.navigate('/settings')}
+        accessibilityRole="button"
+        accessibilityLabel="Open Settings to fix permissions"
+        android_ripple={{ color: Color.borderStrong }}
+        style={({ pressed }) => [styles.bannerAction, pressed && styles.bannerActionPressed]}>
+        <Text style={[Type.labelMd, styles.bannerActionText]}>OPEN SETTINGS</Text>
+        <MaterialIcons name="chevron-right" size={18} color={Color.danger} />
+      </Pressable>
+    </Card>
+  );
+}
+
 function EmptyState() {
   return (
     <View style={styles.empty}>
@@ -133,6 +171,37 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: Space.xs,
+  },
+  banner: {
+    gap: Space.xs,
+    borderColor: 'rgba(255, 90, 95, 0.4)',
+    backgroundColor: 'rgba(255, 90, 95, 0.08)',
+  },
+  bannerHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  bannerTitle: {
+    color: Color.danger,
+  },
+  bannerAction: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xxs,
+    minHeight: Layout.minTouch,
+    paddingHorizontal: Space.sm,
+    marginTop: Space.xxs,
+    marginLeft: -Space.sm,
+    borderRadius: Radius.pill,
+    overflow: 'hidden',
+  },
+  bannerActionPressed: {
+    backgroundColor: 'rgba(255, 90, 95, 0.12)',
+  },
+  bannerActionText: {
+    color: Color.danger,
   },
   empty: {
     alignItems: 'center',

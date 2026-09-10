@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import * as settingsRepo from '@/data/repositories/settings';
 import { fontAssets } from '@/design/fonts';
 import { Color } from '@/design/tokens';
 import { reconcile } from '@/services/alarm-scheduler';
@@ -65,6 +66,7 @@ export default function RootLayout() {
             the ringing alarm, which is an escape hatch out of the challenge.
           */}
           <Stack.Screen name="wake" options={{ animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         </Stack>
       </ThemeProvider>
     </SafeAreaProvider>
@@ -101,8 +103,9 @@ function useReconciliation() {
 }
 
 /**
- * Sends a cold start straight to the wake screen when an alarm is already
- * ringing, and does the same when one fires with the app open.
+ * Decides where a cold start lands: the wake screen if an alarm is ringing, the
+ * permission gate on first run, and the alarm list otherwise. Also sends the
+ * user to the wake screen when an alarm fires with the app already open.
  *
  * The cold path is the one that matters: an alarm normally goes off with no JS
  * context alive, so `onAlarmFired` was broadcast to nobody. What is ringing is
@@ -120,8 +123,15 @@ function useRingingAlarmRouting(ready: boolean): boolean {
     let cancelled = false;
 
     void ringingAlarmId()
-      .then((id) => {
-        if (!cancelled && id) router.replace('/wake');
+      .then(async (id) => {
+        if (cancelled) return;
+        // A ringing alarm outranks first-run setup: the user is being woken up,
+        // not onboarded.
+        if (id) {
+          router.replace('/wake');
+          return;
+        }
+        if (!(await settingsRepo.isOnboardingCompleted())) router.replace('/onboarding');
       })
       .catch((error) => {
         console.warn('[MathAlarm] could not check for a ringing alarm', error);
