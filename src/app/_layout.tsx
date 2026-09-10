@@ -1,14 +1,15 @@
 import { useFonts } from 'expo-font';
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { fontAssets } from '@/design/fonts';
 import { Color } from '@/design/tokens';
 import { reconcile } from '@/services/alarm-scheduler';
+import { ringingAlarmId, subscribeToAlarmFired } from '@/services/wake-session';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,16 +32,20 @@ const AppTheme = {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
+  // A missing font file must not leave the user staring at a splash screen
+  // forever, so a load failure proceeds with the system font instead.
+  const fontsReady = fontsLoaded || !!fontError;
 
   useReconciliation();
+  const wakeChecked = useRingingAlarmRouting(fontsReady);
 
   useEffect(() => {
-    // A missing font file must not leave the user staring at a splash screen
-    // forever, so a load failure proceeds with the system font instead.
-    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
+    // The splash stays up until it is settled whether an alarm is ringing, so
+    // a cold start into a ringing alarm never flashes the alarm list first.
+    if (fontsReady && wakeChecked) void SplashScreen.hideAsync();
+  }, [fontsReady, wakeChecked]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsReady) return null;
 
   return (
     <SafeAreaProvider>
@@ -93,4 +98,65 @@ function useReconciliation() {
     });
     return () => subscription.remove();
   }, []);
+}
+
+/**
+ * Sends a cold start straight to the wake screen when an alarm is already
+ * ringing, and does the same when one fires with the app open.
+ *
+ * The cold path is the one that matters: an alarm normally goes off with no JS
+ * context alive, so `onAlarmFired` was broadcast to nobody. What is ringing is
+ * discovered by asking, not by listening. The event listener exists only for
+ * the far rarer case of an alarm firing while the app is already on screen.
+ *
+ * Gated on the fonts having loaded because that is when this layout first
+ * renders a navigator — there is nothing to navigate before then.
+ */
+function useRingingAlarmRouting(ready: boolean): boolean {
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    void ringingAlarmId()
+      .then((id) => {
+        if (!cancelled && id) router.replace('/wake');
+      })
+      .catch((error) => {
+        console.warn('[MathAlarm] could not check for a ringing alarm', error);
+      })
+      .finally(() => {
+        if (!cancelled) setChecked(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const subscription = subscribeToAlarmFired(() => router.replace('/wake'));
+    return () => subscription.remove();
+  }, [ready]);
+
+  // Asked again on every foreground, not only at launch. It covers an alarm
+  // that fired while the app was backgrounded with no listener attached, and
+  // the rare case of a dismissal whose native call did not land — either way,
+  // an alarm that is audibly ringing must have its challenge on screen.
+  useEffect(() => {
+    if (!ready) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      void ringingAlarmId()
+        .then((id) => {
+          if (id) router.replace('/wake');
+        })
+        .catch(() => {});
+    });
+    return () => subscription.remove();
+  }, [ready]);
+
+  return checked;
 }

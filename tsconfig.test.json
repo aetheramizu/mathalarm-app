@@ -1,5 +1,5 @@
 {
-  "//": "Domain tests only. `domain/` is pure TypeScript with no React, no native module and no SQLite behind it, so it compiles to plain CommonJS and runs under `node --test` on the host — no device, no Metro, and no test framework dependency.",
+  "//": "Host-testable pure TypeScript: everything under `domain/`, plus the wake-screen reducer. None of it imports React, a native module or SQLite at runtime — the reducer's only cross-layer imports are types, which compile away — so it all runs under `node --test` with no device, no Metro and no test framework dependency.",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
@@ -8,9 +8,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "paths": { "@/*": ["./src/*"] },
     "rootDir": "src",
     "outDir": ".test-build",
     "noEmitOnError": true
   },
-  "include": ["src/domain/**/*.ts"]
+  "include": ["src/domain/**/*.ts", "src/features/wake/machine.ts", "src/features/wake/machine.test.ts"]
 }
