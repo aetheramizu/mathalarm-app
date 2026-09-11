@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Alarm } from '@/data/models';
 import * as settingsRepo from '@/data/repositories/settings';
@@ -92,6 +92,21 @@ export default function AlarmsScreen() {
             now={now}
             onPress={() => openEdit(item)}
             onToggle={(enabled) => void setEnabled(item.id, enabled)}
+            onDelete={() => {
+              Alert.alert(
+                'Delete alarm?',
+                'This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => void remove(item.id),
+                  },
+                ],
+                { cancelable: true }
+              );
+            }}
           />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}

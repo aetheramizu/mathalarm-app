@@ -24,6 +24,7 @@ type Props = {
   now: number;
   onPress: () => void;
   onToggle: (enabled: boolean) => void;
+  onDelete: () => void;
 };
 
 /**
@@ -41,7 +42,7 @@ type Props = {
  * separate, sibling controls, so the switch is independently reachable by a
  * screen reader and neither gesture is nested inside the other.
  */
-export function AlarmCard({ alarm, now, onPress, onToggle }: Props) {
+export function AlarmCard({ alarm, now, onPress, onToggle, onDelete }: Props) {
   const time = formatTime(alarm.hour, alarm.minute);
   const clock = splitClock(alarm.hour, alarm.minute);
   const unscheduled = alarm.enabled && alarm.nextTriggerAt === null;
@@ -94,6 +95,13 @@ export function AlarmCard({ alarm, now, onPress, onToggle }: Props) {
         </Pressable>
 
         <View style={styles.toggleWrap}>
+          <Pressable
+            onPress={onDelete}
+            accessibilityRole="button"
+            accessibilityLabel="Delete alarm"
+            style={({ pressed }) => [styles.deleteAction, pressed && styles.deleteActionPressed]}>
+            <MaterialIcons name="delete-outline" size={24} color={Color.textMuted} />
+          </Pressable>
           <Toggle
             value={alarm.enabled}
             onValueChange={onToggle}
@@ -193,7 +201,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: Space.sm,
   },
   details: {
@@ -246,6 +254,15 @@ const styles = StyleSheet.create({
   toggleWrap: {
     paddingRight: Space.md,
     paddingVertical: Space.md,
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  deleteAction: {
+    padding: Space.xs,
+    borderRadius: Radius.sm,
+  },
+  deleteActionPressed: {
+    backgroundColor: Color.cardElevated,
   },
   summary: {
     gap: Space.xs,
