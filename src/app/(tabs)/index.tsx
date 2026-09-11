@@ -67,7 +67,9 @@ export default function AlarmsScreen() {
 
             {!permissionsLoading && alarmsAreBlocked(permissions) ? <PermissionBanner /> : null}
 
-            {next ? <NextAlarmSummary alarm={next} now={now} /> : null}
+            {next ? (
+              <NextAlarmSummary alarm={next} now={now} onPress={() => openEdit(next)} />
+            ) : null}
 
             <PrimaryButton
               label="New alarm"

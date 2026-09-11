@@ -119,6 +119,25 @@ export function AlarmForm({
       visible={visible}
       title={alarm ? 'Edit alarm' : 'New alarm'}
       onClose={onClose}
+      /*
+        The wheels are pinned rather than scrolled with the rest of the form.
+        They are vertical scrollers themselves, and inside the sheet's scrolling
+        body Android gives the drag to the outer view — the wheels look present
+        and simply refuse to turn. Pinning them also puts the field the form is
+        actually about above the fold, which it should be anyway.
+
+        Keyed on which alarm the sheet is showing, so the wheels are remounted —
+        and therefore re-seeded — whenever the subject changes, rather than
+        depending on the modal happening to unmount its children when it closes.
+      */
+      header={
+        <TimePicker
+          key={alarm?.id ?? 'new'}
+          hour={time.hour}
+          minute={time.minute}
+          onChange={setTime}
+        />
+      }
       footer={
         <>
           <PrimaryButton
@@ -130,18 +149,6 @@ export function AlarmForm({
           {alarm ? <DangerButton label="Delete alarm" icon="delete-outline" onPress={confirmDelete} /> : null}
         </>
       }>
-      {/*
-        Keyed on which alarm the sheet is showing, so the wheels are remounted —
-        and therefore re-seeded — whenever the subject changes, rather than
-        depending on the modal happening to unmount its children when it closes.
-      */}
-      <TimePicker
-        key={alarm?.id ?? 'new'}
-        hour={time.hour}
-        minute={time.minute}
-        onChange={setTime}
-      />
-
       <Field label="LABEL">
         <TextInput
           value={label}

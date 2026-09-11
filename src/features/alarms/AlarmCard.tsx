@@ -3,13 +3,21 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Alarm } from '@/data/models';
 import { REQUIRED_PROBLEMS } from '@/domain/math/engine';
-import { Color, Space } from '@/design/tokens';
-import { Type } from '@/design/typography';
+import { Color, Radius, Space } from '@/design/tokens';
+import { FontFamily, Type } from '@/design/typography';
 import { Card } from '@/ui/card';
 import { Chip } from '@/ui/chip';
 import { Toggle } from '@/ui/toggle';
 
-import { describeAlarm, formatCountdown, formatRepeat, formatTime, formatWhen } from './format';
+import {
+  describeAlarm,
+  formatCountdown,
+  formatCountdownValue,
+  formatRepeat,
+  formatTime,
+  formatWhen,
+  splitClock,
+} from './format';
 
 type Props = {
   alarm: Alarm;
@@ -35,6 +43,7 @@ type Props = {
  */
 export function AlarmCard({ alarm, now, onPress, onToggle }: Props) {
   const time = formatTime(alarm.hour, alarm.minute);
+  const clock = splitClock(alarm.hour, alarm.minute);
   const unscheduled = alarm.enabled && alarm.nextTriggerAt === null;
 
   return (
@@ -54,9 +63,16 @@ export function AlarmCard({ alarm, now, onPress, onToggle }: Props) {
             !alarm.enabled && styles.off,
             pressed && styles.detailsPressed,
           ]}>
-          <Text style={[Type.displayAlarm, styles.time]} numberOfLines={1}>
-            {time}
-          </Text>
+          {/*
+            No accessibility props: the pressable around it is already one node
+            carrying the whole alarm, digits and meridiem included.
+          */}
+          <View style={styles.clock}>
+            <Text style={[Type.displayAlarm, styles.time]} numberOfLines={1}>
+              {clock.time}
+            </Text>
+            <Text style={[Type.labelLg, styles.meridiem]}>{clock.meridiem}</Text>
+          </View>
 
           {alarm.label ? (
             <Text style={Type.bodyLg} numberOfLines={1}>
@@ -98,26 +114,68 @@ export function AlarmCard({ alarm, now, onPress, onToggle }: Props) {
   );
 }
 
-/** The armed alarm the user actually cares about, given its own summary card. */
-export function NextAlarmSummary({ alarm, now }: { alarm: Alarm; now: number }) {
-  const time = formatTime(alarm.hour, alarm.minute);
+/**
+ * The armed alarm the user actually cares about, given its own summary card.
+ *
+ * Two things were wrong with it. It was the most prominent thing on the screen
+ * and the only card that did nothing when tapped, which reads as a bug rather
+ * than as a decision — so it now opens the same editor every other alarm row
+ * does. And the number the user actually came to the screen for, how long they
+ * have got, was set in the smallest type on the card, below a weekday name that
+ * matters far less. That is now the headline: the time the alarm is set for is
+ * a fact you already know, "3h 42m" is the one you are checking.
+ */
+export function NextAlarmSummary({
+  alarm,
+  now,
+  onPress,
+}: {
+  alarm: Alarm;
+  now: number;
+  onPress: () => void;
+}) {
+  const clock = splitClock(alarm.hour, alarm.minute);
   const when = alarm.nextTriggerAt === null ? '' : formatWhen(alarm.nextTriggerAt, now);
-  const countdown = alarm.nextTriggerAt === null ? '' : formatCountdown(alarm.nextTriggerAt, now);
+  const countdown =
+    alarm.nextTriggerAt === null ? '' : formatCountdownValue(alarm.nextTriggerAt, now);
 
   return (
-    <Card style={styles.summary}>
-      <Text style={Type.labelSm}>NEXT ALARM</Text>
+    <Card
+      style={styles.summary}
+      onPress={onPress}
+      accessibilityLabel={`Next alarm, ${formatTime(alarm.hour, alarm.minute)}, ${describeAlarm(
+        alarm,
+        now
+      )}`}
+      accessibilityHint="Opens this alarm for editing">
+      <View style={styles.summaryHead}>
+        <Text style={Type.labelSm}>NEXT ALARM</Text>
+        <Text style={[Type.labelSm, styles.summaryWhen]} numberOfLines={1}>
+          {when.toUpperCase()}
+        </Text>
+        {/*
+          The card is the button, so the chevron is decoration for the eye and
+          is kept out of the accessibility tree — the hint above already says
+          what tapping does.
+        */}
+        <MaterialIcons
+          name="chevron-right"
+          size={18}
+          color={Color.textMuted}
+          importantForAccessibility="no"
+        />
+      </View>
 
-      <View style={styles.summaryRow}>
-        <Text style={[Type.displayAlarm, styles.summaryTime]}>{time}</Text>
-        <View style={styles.summaryMeta}>
-          <Text style={[Type.labelMd, styles.summaryWhen]} numberOfLines={1}>
-            {when.toUpperCase()}
-          </Text>
-          <Text style={[Type.bodySm, styles.summaryCountdown]} numberOfLines={1}>
-            {countdown}
-          </Text>
-        </View>
+      <View style={styles.clock}>
+        <Text style={Type.displayAlarm}>{clock.time}</Text>
+        <Text style={[Type.labelLg, styles.meridiem]}>{clock.meridiem}</Text>
+      </View>
+
+      <View style={styles.countdown}>
+        <Text style={Type.labelSm}>RINGS IN</Text>
+        <Text style={styles.countdownValue} numberOfLines={1}>
+          {countdown}
+        </Text>
       </View>
 
       <Text style={Type.bodyMd} numberOfLines={1}>
@@ -151,9 +209,19 @@ const styles = StyleSheet.create({
   off: {
     opacity: 0.45,
   },
+  // Baseline-aligned rather than centred: the meridiem should sit on the same
+  // line the digits stand on, the way it does on a clock face.
+  clock: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Space.xs,
+  },
   time: {
     fontSize: 40,
     lineHeight: 46,
+  },
+  meridiem: {
+    color: Color.textSecondary,
   },
   chips: {
     flexDirection: 'row',
@@ -184,23 +252,36 @@ const styles = StyleSheet.create({
     borderColor: Color.magentaEdge,
     backgroundColor: Color.card,
   },
-  summaryRow: {
+  summaryHead: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: Space.sm,
-  },
-  summaryTime: {
-    flexShrink: 1,
-  },
-  summaryMeta: {
-    alignItems: 'flex-end',
-    paddingBottom: Space.xs,
+    alignItems: 'center',
+    gap: Space.xs,
   },
   summaryWhen: {
+    flex: 1,
+    textAlign: 'right',
     color: Color.magentaText,
   },
-  summaryCountdown: {
-    color: Color.textSecondary,
+  // Its own banded row rather than a line of body text: this is the number the
+  // screen exists to answer, and it has to be readable from across a room.
+  countdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+    marginTop: Space.xxs,
+    paddingVertical: Space.xs,
+    paddingHorizontal: Space.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Color.magentaFill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Color.magentaEdge,
+  },
+  countdownValue: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.5,
+    color: Color.magentaText,
   },
 });

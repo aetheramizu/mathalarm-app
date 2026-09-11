@@ -54,14 +54,20 @@ confirm the wake-up is listed with the outcome named.
 | 23 | Gesture navigation | Set the phone to gesture navigation; visit all three tabs and scroll each to the bottom | Tab labels sit clear of the gesture pill; the last row of every list is fully readable above the tab bar; the strip behind the pill is the same void as the bar, with no lighter band |
 | 24 | Three-button navigation | Switch the phone to three-button navigation and repeat #23 | The tab bar sits directly above the button row, not underneath it; no scrim or grey band between them; buttons are light on the void |
 | 25 | Immersive challenge | Let an alarm fire on both navigation modes | Status bar and navigation bar are gone for the whole challenge; the equation and keypad clear the camera cutout; a swipe from an edge may reveal the bars transiently, and back still does nothing; solving restores both bars for the rest of the app |
-| 26 | Time wheels | Open an existing alarm, fling both wheels, edit a second alarm | Each wheel opens already centred on the alarm's own time, never scrolling up to it; flings snap cleanly to a row; the centred value is the one saved; ticks are felt but not machine-gunned |
+| 26 | Time wheels | Open an existing alarm, fling all three wheels, edit a second alarm | Every wheel actually turns under a thumb; each opens already centred on the alarm's own time, never scrolling up to it; flings snap cleanly to a row; the centred values are the ones saved; ticks are felt but not machine-gunned |
+| 26a | Meridiem follows the hour | Step the hour wheel 11 → 12, then 12 → 11; then fling from 3 straight to 12 | The step across 11/12 flips AM/PM in both directions and the meridiem wheel visibly scrolls itself; the fling that never passed 11 leaves it alone |
+| 26b | One clock everywhere | Save an evening alarm | The list card, the next-alarm summary and the wheels all read the same 12-hour time; nothing anywhere shows the 24-hour form |
+| 26c | Endless wheels | Fling the hour wheel past 12 and the minute wheel past 59, repeatedly and in both directions | Both wrap straight round to 1 and 00 and keep going; no end stop is ever reached, and no visible jump or stutter when the strip recentres itself |
+| 26d | Wheel always lands in the band | Drag a wheel a little way and let go *slowly*, with no flick, several times on each wheel | It snaps into the band in the same moment the finger lifts — no pause, no drift, never parked half in and half out. Repeat with hard flings and with a tap on a neighbour; same result every time. No vibration at any point while scrolling |
+| 26d | Tap a neighbour | Tap the row directly above and below the selected value on each wheel, then tap a row two out | The neighbour scrolls to the centre and becomes the value; the row two out does nothing and the wheel still drags normally over it |
+| 26e | Next-alarm card | Tap the next-alarm card on the Alarms tab | It opens that alarm in the editor, the same as tapping its row in the list; the countdown below the clock is the largest number on the card and updates each minute |
 | 27 | Wake feedback | Answer one problem right, then one wrong | Right: a success buzz, a filled segment, the next equation fades in from below; wrong: an error buzz, the answer field flashes red and shakes once, and the line beneath says a new problem is up. Neither outcome is identifiable by colour alone |
 | 28 | Reduced motion | Turn on Android's "Remove animations", then fire an alarm | The ringing dot, the equation swap, the shake and the caret blink all stop; every one of them lands on its finished state, nothing is invisible or stuck mid-transition, and the challenge is still fully solvable |
 
 ## What a failure means
 
 - **Rows 1–8, 12–15** are the product. A failure here blocks v1.
-- **Rows 9–11, 16–28** are correctness around it. A failure is a bug to fix
+- **Rows 9–11, 16–28** (including the 26x set) are correctness around it. A failure is a bug to fix
   before daily use, not necessarily before the next build.
 - **Row 18** is the one where the honest answer may be "this OEM is hostile".
   `PRD.md` §13 accepts that; the battery-optimisation exemption is the mitigation

@@ -1,4 +1,3 @@
-import { NavigationBar } from 'expo-navigation-bar';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -7,6 +6,14 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Color } from '@/design/tokens';
 import { WakeChallenge } from '@/features/wake/WakeChallenge';
 import { useWakeMachine } from '@/features/wake/useWakeMachine';
+
+let NavigationBar: React.ComponentType<{ hidden?: boolean }> | null = null;
+try {
+  // Graceful fallback if the native module is missing from the dev client
+  NavigationBar = require('expo-navigation-bar').NavigationBar;
+} catch (e) {
+  console.warn("expo-navigation-bar native module is missing. Navigation bar will not be hidden.");
+}
 
 /**
  * The full-screen challenge, and the reason this route is a sibling of the tab
@@ -76,7 +83,7 @@ function Immersive() {
   return (
     <>
       <StatusBar hidden />
-      <NavigationBar hidden />
+      {NavigationBar && <NavigationBar hidden />}
     </>
   );
 }

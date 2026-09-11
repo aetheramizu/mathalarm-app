@@ -11,6 +11,15 @@ type Props = {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /**
+   * Pinned between the title and the scrolling body.
+   *
+   * For the one control a form is really about — and, just as importantly, for
+   * anything that scrolls itself. A vertical scroller nested inside the body's
+   * vertical scroller never receives the drag on Android: the outer view
+   * intercepts it and the inner one sits there looking broken.
+   */
+  header?: ReactNode;
   /** Pinned below the scrolling body, so the save action is always reachable. */
   footer?: ReactNode;
 };
@@ -27,7 +36,7 @@ type Props = {
  * landscape or at large system text sizes, and a save button that scrolls out
  * of reach is how a user ends up unable to finish.
  */
-export function Sheet({ visible, title, onClose, children, footer }: Props) {
+export function Sheet({ visible, title, onClose, children, header, footer }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -61,6 +70,8 @@ export function Sheet({ visible, title, onClose, children, footer }: Props) {
               <MaterialIcons name="close" size={22} color={Color.textSecondary} />
             </Pressable>
           </View>
+
+          {header ? <View style={styles.pinned}>{header}</View> : null}
 
           <ScrollView
             style={styles.body}
@@ -114,8 +125,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pinned: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: Space.lg,
+  },
   body: {
     flexGrow: 0,
+    // Without this the body refuses to give ground when the pinned area and
+    // the footer together want more room than the sheet's 92% allows, and the
+    // save button is pushed off the bottom of the screen.
+    flexShrink: 1,
   },
   bodyContent: {
     paddingHorizontal: Layout.screenPadding,
