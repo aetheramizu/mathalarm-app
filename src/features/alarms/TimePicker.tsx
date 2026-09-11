@@ -1,20 +1,22 @@
 import * as Haptics from 'expo-haptics';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
+  Pressable,
   StyleSheet,
   Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ScrollView,
+  type TextStyle,
 } from 'react-native';
 
 import { Color, Radius, Space } from '@/design/tokens';
-import { FontFamily, Type } from '@/design/typography';
+import { FontFamily } from '@/design/typography';
 
 /**
- * Time entry as two scrolling wheels, HH and MM on a 24-hour clock.
+ * Time entry as three scrolling wheels: hour, minute, AM/PM.
  *
  * This replaces the four-digit keypad the form used to carry. The keypad was
  * unambiguous, but it was four deliberate taps to say "07:30" and it read as a
@@ -28,6 +30,21 @@ import { FontFamily, Type } from '@/design/typography';
  * fallback the keypad gave for free is provided explicitly instead — each wheel
  * is an adjustable, so a screen reader steps it one value at a time and never
  * has to perform a drag.
+ *
+ * ## Twelve hours on the outside, twenty-four on the inside
+ *
+ * The wheels read 1–12 with a meridiem beside them, which is how the user reads
+ * a clock. Everything behind this component — the alarm row, the scheduler, the
+ * database — stays on the 24-hour clock it has always used, because that is the
+ * only representation in which "is 00:30 before or after 12:30" has one answer.
+ * The conversion lives here and nowhere else.
+ *
+ * ## Where this component may be mounted
+ *
+ * Each wheel is a vertical scroller, so this must not be placed inside another
+ * vertical scroller: on Android the outer one intercepts the drag and the
+ * wheels simply do not move. It belongs in the sheet's pinned header, which is
+ * exactly what that slot exists for.
  */
 
 /** One row. Also the snap interval, and the unit every offset is measured in. */
@@ -38,57 +55,154 @@ const PADDING_ITEMS = (VISIBLE_ITEMS - 1) / 2;
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
 /**
- * A tick per value crossed is what a physical wheel does, and it is how the
- * user knows a fling landed somewhere without reading it. A fast fling crosses
- * sixty values, though, so the ticks are rate-limited to something the motor
- * can actually reproduce.
+ * Below this, Android will not start a fling — the gesture is over the moment
+ * the finger leaves the glass.
+ *
+ * In density-independent pixels per second, which is the unit React Native
+ * reports scroll velocity in on Android (it runs the raw pixel value through
+ * `toDIPFromPixel` on the way out). That matters, because the platform's own
+ * `ViewConfiguration.getMinimumFlingVelocity` is 50 in those same units: the
+ * threshold has to sit safely *under* it, or a release that was about to be
+ * carried further gets stopped dead instead.
  */
-const HAPTIC_INTERVAL_MS = 45;
+const FLING_VELOCITY = 40;
+
+/**
+ * The fallback wait for a release too fast to settle on the spot but which
+ * turns out not to fling after all. Cancelled the moment momentum is reported,
+ * which is almost always what happens instead.
+ */
+const SETTLE_GRACE_MS = 60;
+
+/**
+ * How much runway a looping wheel keeps on each side of the row it is resting
+ * on, in rows.
+ *
+ * A hard fling on a 52dp wheel covers well under this, so the user can never
+ * reach either end of the strip before it is silently recentred — which is the
+ * whole illusion. See `bandsFor`.
+ */
+const LOOP_RUNWAY_ROWS = 40;
+
+const HOURS = Array.from({ length: 12 }, (_, index) => String(index + 1));
+const MINUTES = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
+const MERIDIEMS = ['AM', 'PM'];
+
+/** Index into `HOURS` for twelve o'clock — the row either side of which the day flips. */
+const TWELVE = 11;
+/** Index into `HOURS` for eleven o'clock. */
+const ELEVEN = 10;
+
+const PM = 1;
 
 type Props = {
+  /** On the 24-hour clock, 0–23, exactly as the alarm stores it. */
   hour: number;
   minute: number;
   onChange: (time: { hour: number; minute: number }) => void;
 };
 
 export function TimePicker({ hour, minute, onChange }: Props) {
+  const hourIndex = to12HourIndex(hour);
+  const meridiemIndex = hour >= 12 ? PM : 0;
+
+  /**
+   * A real clock face flips from morning to afternoon as it passes twelve, and
+   * nowhere else. So the meridiem follows the hour wheel across the 11/12
+   * boundary in either direction, and stays put for every other move —
+   * including the wrap from twelve round to one, which on a real dial is an
+   * hour into the same half of the day, not out of it.
+   *
+   * Only an *adjacent* step counts. A fling from three o'clock that lands on
+   * twelve never travelled through eleven, and a dial that was not turned past
+   * the top has not changed the half of the day it is in.
+   */
+  const selectHour = (nextIndex: number) => {
+    const crossedTwelve =
+      (hourIndex === ELEVEN && nextIndex === TWELVE) ||
+      (hourIndex === TWELVE && nextIndex === ELEVEN);
+    const nextMeridiem = crossedTwelve ? 1 - meridiemIndex : meridiemIndex;
+    onChange({ hour: to24Hour(nextIndex, nextMeridiem), minute });
+  };
+
   return (
-    <View style={styles.root}>
-      <View style={styles.wheels}>
-        {/*
-          The selection band, drawn once behind both wheels rather than as part
-          of either. It is what makes the centre row read as "the value" while
-          the rows above and below are visibly the neighbours you could scroll
-          to, and it stays put while they move.
-        */}
-        <View pointerEvents="none" style={styles.band} />
+    <View style={styles.wheels}>
+      {/*
+        The selection band, drawn once behind all three wheels rather than as
+        part of any of them. It is what makes the centre row read as "the value"
+        while the rows above and below are visibly the neighbours you could
+        scroll to, and it stays put while they move.
+      */}
+      <View pointerEvents="none" style={styles.band} />
 
-        <Wheel
-          label="Hour"
-          count={24}
-          value={hour}
-          onSelect={(next) => onChange({ hour: next, minute })}
-        />
-        <Text style={styles.separator}>:</Text>
-        <Wheel
-          label="Minute"
-          count={60}
-          value={minute}
-          onSelect={(next) => onChange({ hour, minute: next })}
-        />
-      </View>
-
-      <Text style={[Type.labelSm, styles.hint]}>24-HOUR CLOCK</Text>
+      <Wheel label="Hour" items={HOURS} index={hourIndex} onSelect={selectHour} width={72} loop />
+      <Text style={styles.separator}>:</Text>
+      <Wheel
+        label="Minute"
+        items={MINUTES}
+        index={minute}
+        onSelect={(next) => onChange({ hour, minute: next })}
+        width={72}
+        loop
+      />
+      {/*
+        The meridiem does not loop. There are two of them; a wheel that can be
+        flung endlessly between two values is a fidget, not a control, and the
+        pair is short enough that both are on screen at once anyway.
+      */}
+      <Wheel
+        label="AM or PM"
+        items={MERIDIEMS}
+        index={meridiemIndex}
+        onSelect={(next) => onChange({ hour: to24Hour(hourIndex, next), minute })}
+        width={64}
+        textStyle={styles.meridiemText}
+      />
     </View>
   );
 }
 
+/** 0–23 to a row on the 1–12 wheel. Midnight and noon are both "12". */
+function to12HourIndex(hour24: number): number {
+  const hour12 = hour24 % 12;
+  return hour12 === 0 ? TWELVE : hour12 - 1;
+}
+
+/** A row on the 1–12 wheel plus a meridiem, back to 0–23. */
+function to24Hour(hourIndex: number, meridiemIndex: number): number {
+  const hour12 = hourIndex + 1;
+  const base = hour12 === 12 ? 0 : hour12;
+  return meridiemIndex === PM ? base + 12 : base;
+}
+
+/**
+ * How many copies of the value list a looping wheel lays end to end.
+ *
+ * An endless wheel is really a long finite one that jumps back to the middle
+ * whenever the user stops. Always an odd number of copies, so there *is* a
+ * middle copy to jump back to, and enough copies either side of it that no
+ * fling can reach an end before that jump happens.
+ */
+function bandsFor(count: number, loop: boolean): number {
+  if (!loop) return 1;
+  return 1 + 2 * Math.ceil(LOOP_RUNWAY_ROWS / count);
+}
+
+/** Wraps any row on the strip back to the value it is showing. */
+function valueOfRow(row: number, count: number): number {
+  return ((row % count) + count) % count;
+}
+
 type WheelProps = {
   label: string;
-  /** Values run 0 to `count - 1`. */
-  count: number;
-  value: number;
-  onSelect: (value: number) => void;
+  /** What each row reads. The value is the row's position in here. */
+  items: string[];
+  index: number;
+  onSelect: (index: number) => void;
+  width: number;
+  /** Whether the wheel runs on forever, wrapping from the last value to the first. */
+  loop?: boolean;
+  textStyle?: TextStyle;
 };
 
 /**
@@ -104,55 +218,197 @@ type WheelProps = {
  * offset to the nearest row makes those two agree: at the end of a drag the
  * rounded row is the one snapping is on its way to, which is the same row the
  * momentum will finish at.
+ *
+ * ## Two ways to use it
+ *
+ * Dragging is the primary one. But a neighbour of the selected row can also
+ * simply be tapped, which is faster and steadier than a drag for the very
+ * common case of being one value out. Only the immediate neighbours are
+ * tappable: a tap that jumped four rows would be a different gesture with a
+ * different meaning, and a wheel where any visible row is a button stops
+ * reading as a wheel.
  */
-function Wheel({ label, count, value, onSelect }: WheelProps) {
-  const values = useMemo(() => Array.from({ length: count }, (_, index) => index), [count]);
+function Wheel({ label, items, index, onSelect, width, loop = false, textStyle }: WheelProps) {
+  const count = items.length;
+  const bands = bandsFor(count, loop);
+
+  /** The row the middle copy of the list starts at — always a multiple of `count`. */
+  const middleBase = Math.floor(bands / 2) * count;
+
+  const rows = useMemo(
+    () => Array.from({ length: count * bands }, (_, row) => items[valueOfRow(row, count)]),
+    [items, count, bands]
+  );
 
   // Seeded so the very first frame is already at the right row: the wheel
   // mounts with the sheet, and starting at zero would show a visible scroll up
   // to the alarm's real time every time the form opens.
-  const initialOffset = useRef(clampIndex(value, count) * ITEM_HEIGHT).current;
+  const initialRow = middleBase + clampRow(index, count);
+  const initialOffset = useRef(initialRow * ITEM_HEIGHT).current;
   const scrollY = useRef(new Animated.Value(initialOffset)).current;
   const scrollRef = useRef<ScrollView>(null);
 
-  const lastTickIndex = useRef(clampIndex(value, count));
-  const lastTickAt = useRef(0);
+  /**
+   * The row on the strip this wheel believes it is resting on.
+   *
+   * Rows rather than values, because a looping wheel has many rows per value
+   * and the difference is what decides whether it needs recentring — and what
+   * makes "the row above the current one" a question with an answer.
+   *
+   * It also tells a change that came from the outside — the meridiem being
+   * flipped by the hour wheel — apart from one this wheel just made itself.
+   * Only the former should move the scroller under the user.
+   */
+  const settledRow = useRef(initialRow);
 
-  const indexAt = (event: NativeSyntheticEvent<NativeScrollEvent>) =>
-    clampIndex(event.nativeEvent.contentOffset.y / ITEM_HEIGHT, count);
+  /**
+   * The offset the wheel is at right now, kept fresh by every scroll event.
+   *
+   * `settle` needs the live offset rather than the one captured when a drag
+   * ended, because it may run a frame or two later — and it is the offset, not
+   * the row, that says whether the value is actually sitting in the band.
+   */
+  const offset = useRef(initialOffset);
 
-  const tick = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = indexAt(event);
-    if (index === lastTickIndex.current) return;
-    lastTickIndex.current = index;
+  const flinging = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const now = Date.now();
-    if (now - lastTickAt.current < HAPTIC_INTERVAL_MS) return;
-    lastTickAt.current = now;
-    void Haptics.selectionAsync().catch(() => {});
+  const cancelTimers = () => {
+    if (settleTimer.current !== null) clearTimeout(settleTimer.current);
+    if (snapTimer.current !== null) clearTimeout(snapTimer.current);
+    settleTimer.current = null;
+    snapTimer.current = null;
   };
 
-  const commit = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = indexAt(event);
-    lastTickIndex.current = index;
-    if (index !== value) onSelect(index);
+  useEffect(() => cancelTimers, []);
+
+  const recenterAfterSnap = (row: number, value: number) => {
+    if (!loop) return;
+    const home = middleBase + value;
+    if (home !== row) {
+      snapTimer.current = setTimeout(() => {
+        snapTimer.current = null;
+        if (flinging.current) return;
+        moveToRow(home, false);
+      }, 400);
+    }
+  };
+
+  const moveToRow = (row: number, animated: boolean) => {
+    settledRow.current = row;
+    offset.current = row * ITEM_HEIGHT;
+    scrollRef.current?.scrollTo({ y: row * ITEM_HEIGHT, animated });
+  };
+
+  // Follows the prop when something else moved it — the meridiem being flipped
+  // by the hour wheel crossing twelve. Never reports back: the value is already
+  // whatever the parent just set it to, and answering would be an echo.
+  useEffect(() => {
+    if (valueOfRow(settledRow.current, count) === index) return;
+    moveToRow(middleBase + index, true);
+  }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * The only thing JavaScript does while the wheel is moving: remember where it
+   * is. The scaling and dimming are already running natively, and this has to
+   * stay this cheap — the wheel used to buzz once per value crossed, which was
+   * a bridge call every 45ms during a fling and made the scroll feel worse than
+   * the tick was worth.
+   */
+  const trackScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    offset.current = event.nativeEvent.contentOffset.y;
+    settledRow.current = clampRow(offset.current / ITEM_HEIGHT, rows.length);
+  };
+
+  /**
+   * Brings the wheel to rest with the nearest value centred in the band, and
+   * commits it.
+   *
+   * With native snap properties removed to preserve smooth deceleration, this
+   * is what provides the precise stop. If the wheel naturally settled slightly
+   * off a row, it smoothly animates to the exact centre, then silently jumps
+   * back to the middle of the loop runway once that snap finishes.
+   */
+  const settle = () => {
+    const row = clampRow(offset.current / ITEM_HEIGHT, rows.length);
+    const value = valueOfRow(row, count);
+    settledRow.current = row;
+    if (value !== index) onSelect(value);
+
+    const isExact = Math.abs(offset.current - row * ITEM_HEIGHT) < 0.5;
+
+    if (isExact) {
+      if (loop) {
+        const home = middleBase + value;
+        if (home !== row) moveToRow(home, false);
+      }
+      return;
+    }
+
+    moveToRow(row, true);
+    recenterAfterSnap(row, value);
+  };
+
+  /**
+   * A released drag either hands off to a fling or ends the gesture there.
+   *
+   * The velocity Android reports with the release says which, and that is worth
+   * reading rather than waiting to find out: a slow release is exactly the case
+   * the platform will not snap, and making the user watch a timer expire before
+   * the value drops into the band is the delay that made this feel unfinished.
+   * Below the fling threshold the gesture is over, so the wheel settles on the
+   * spot, in the same frame the finger lifts.
+   *
+   * Above it, settling now would kill a fling that is about to start, so the
+   * wheel leaves the job to `onMomentumScrollEnd` — with a short timer behind
+   * it in case the fling never materialises. Momentum beginning cancels it.
+   */
+  const onDragEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    cancelTimers();
+    offset.current = event.nativeEvent.contentOffset.y;
+
+    if (Math.abs(event.nativeEvent.velocity?.y ?? 0) < FLING_VELOCITY) {
+      settle();
+      return;
+    }
+
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      if (flinging.current) return;
+      settle();
+    }, SETTLE_GRACE_MS);
+  };
+
+  /** A tap on the row directly above or below the selected one. */
+  const pressRow = (row: number) => {
+    if (Math.abs(row - settledRow.current) !== 1) return;
+    void Haptics.selectionAsync().catch(() => {});
+    cancelTimers();
+    moveToRow(row, true);
+    const value = valueOfRow(row, count);
+    onSelect(value);
+    recenterAfterSnap(row, value);
   };
 
   /** Steps the wheel for a screen reader, which never performs the drag. */
   const step = (delta: number) => {
-    const next = clampIndex(value + delta, count);
-    if (next === value) return;
-    scrollRef.current?.scrollTo({ y: next * ITEM_HEIGHT, animated: true });
-    onSelect(next);
+    const next = settledRow.current + delta;
+    if (next < 0 || next >= rows.length) return;
+    cancelTimers();
+    moveToRow(next, true);
+    const value = valueOfRow(next, count);
+    onSelect(value);
+    recenterAfterSnap(next, value);
   };
 
   return (
     <View
-      style={styles.wheel}
+      style={[styles.wheel, { width }]}
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={label}
-      accessibilityValue={{ min: 0, max: count - 1, now: value, text: pad(value) }}
+      accessibilityValue={{ min: 0, max: count - 1, now: index, text: items[index] }}
       accessibilityActions={ADJUST_ACTIONS}
       onAccessibilityAction={({ nativeEvent }) => {
         step(nativeEvent.actionName === 'increment' ? 1 : -1);
@@ -161,21 +417,43 @@ function Wheel({ label, count, value, onSelect }: WheelProps) {
         ref={scrollRef}
         contentOffset={{ x: 0, y: initialOffset }}
         showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        // The rows are a fixed 52dp tall and there are at most sixty of them, so
-        // the whole column is cheap to lay out at once; virtualising it would
-        // buy nothing and cost the native scaling its input range.
+        decelerationRate="normal"
+        // Belt and braces. The wheel is meant to live outside any other
+        // scroller, but if one ever ends up above it, this is what lets Android
+        // hand the drag down here instead of eating it.
+        nestedScrollEnabled
+        // The rows are a fixed 52dp tall and there are a couple of hundred of
+        // them at most; the whole strip is cheap to lay out at once, and
+        // virtualising it would cost the native scaling its input range and the
+        // loop its silent recentring.
         contentContainerStyle={styles.wheelContent}
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
           useNativeDriver: true,
-          listener: tick,
+          listener: trackScroll,
         })}
-        onScrollEndDrag={commit}
-        onMomentumScrollEnd={commit}>
-        {values.map((item) => (
-          <WheelItem key={item} index={item} scrollY={scrollY} />
+        onScrollBeginDrag={() => {
+          flinging.current = false;
+          cancelTimers();
+        }}
+        onScrollEndDrag={onDragEnd}
+        onMomentumScrollBegin={() => {
+          flinging.current = true;
+          cancelTimers();
+        }}
+        onMomentumScrollEnd={() => {
+          flinging.current = false;
+          settle();
+        }}>
+        {rows.map((text, row) => (
+          <WheelItem
+            key={row}
+            row={row}
+            text={text}
+            scrollY={scrollY}
+            onPress={pressRow}
+            textStyle={textStyle}
+          />
         ))}
       </Animated.ScrollView>
     </View>
@@ -186,21 +464,37 @@ function Wheel({ label, count, value, onSelect }: WheelProps) {
  * One row of one wheel.
  *
  * Size and dimming both come from the distance to the centre, which is exactly
- * what the scroll offset already encodes — the row at offset `index *
+ * what the scroll offset already encodes — the row at offset `row *
  * ITEM_HEIGHT` is the selected one, and every row away from it is a step down
  * the ramp.
  *
  * `scale` rather than `fontSize` because only transforms and opacity run on the
  * native driver; a font size animated from JavaScript would stutter under the
  * very fling it is meant to illustrate.
+ *
+ * Every row is pressable, and the wheel decides whether a given press means
+ * anything — the alternative is re-rendering two hundred rows on every scroll
+ * just to keep track of which three are currently neighbours.
  */
-function WheelItem({ index, scrollY }: { index: number; scrollY: Animated.Value }) {
+function WheelItem({
+  row,
+  text,
+  scrollY,
+  onPress,
+  textStyle,
+}: {
+  row: number;
+  text: string;
+  scrollY: Animated.Value;
+  onPress: (row: number) => void;
+  textStyle?: TextStyle;
+}) {
   const inputRange = [
-    (index - 2) * ITEM_HEIGHT,
-    (index - 1) * ITEM_HEIGHT,
-    index * ITEM_HEIGHT,
-    (index + 1) * ITEM_HEIGHT,
-    (index + 2) * ITEM_HEIGHT,
+    (row - 2) * ITEM_HEIGHT,
+    (row - 1) * ITEM_HEIGHT,
+    row * ITEM_HEIGHT,
+    (row + 1) * ITEM_HEIGHT,
+    (row + 2) * ITEM_HEIGHT,
   ];
 
   const scale = scrollY.interpolate({
@@ -218,30 +512,27 @@ function WheelItem({ index, scrollY }: { index: number; scrollY: Animated.Value 
     <Animated.View style={[styles.item, { opacity, transform: [{ scale }] }]}>
       {/*
         Hidden from the screen reader: the wheel around it already announces the
-        selected value, and eighty-four readable rows would bury it.
+        selected value and steps through them on request, and two hundred
+        readable rows would bury both.
       */}
-      <Text style={styles.itemText} importantForAccessibility="no-hide-descendants">
-        {pad(index)}
-      </Text>
+      <Pressable
+        onPress={() => onPress(row)}
+        style={styles.itemHit}
+        importantForAccessibility="no-hide-descendants">
+        <Text style={[styles.itemText, textStyle]}>{text}</Text>
+      </Pressable>
     </Animated.View>
   );
 }
 
 const ADJUST_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
-function clampIndex(index: number, count: number): number {
-  if (!Number.isFinite(index)) return 0;
-  return Math.min(count - 1, Math.max(0, Math.round(index)));
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
+function clampRow(row: number, length: number): number {
+  if (!Number.isFinite(row)) return 0;
+  return Math.min(length - 1, Math.max(0, Math.round(row)));
 }
 
 const styles = StyleSheet.create({
-  root: {
-    gap: Space.xs,
-  },
   wheels: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -260,7 +551,6 @@ const styles = StyleSheet.create({
     borderColor: Color.borderStrong,
   },
   wheel: {
-    width: 92,
     height: WHEEL_HEIGHT,
   },
   wheelContent: {
@@ -268,12 +558,15 @@ const styles = StyleSheet.create({
   },
   item: {
     height: ITEM_HEIGHT,
+  },
+  itemHit: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   itemText: {
     fontFamily: FontFamily.monoBold,
-    fontSize: 40,
+    fontSize: 38,
     lineHeight: ITEM_HEIGHT,
     letterSpacing: -1,
     color: Color.textPrimary,
@@ -282,15 +575,18 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlign: 'center',
   },
+  // Two letters rather than two digits, so it needs its own size to sit on the
+  // same optical line as the numbers instead of overrunning its column.
+  meridiemText: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 22,
+    letterSpacing: 0.5,
+  },
   separator: {
     fontFamily: FontFamily.monoBold,
-    fontSize: 34,
+    fontSize: 32,
     lineHeight: ITEM_HEIGHT,
     color: Color.textSecondary,
     paddingHorizontal: Space.xxs,
-  },
-  hint: {
-    textAlign: 'center',
-    color: Color.textMuted,
   },
 });
