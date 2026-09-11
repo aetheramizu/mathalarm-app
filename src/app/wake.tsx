@@ -1,9 +1,13 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import * as sessionsRepo from '@/data/repositories/sessions';
 import { Color } from '@/design/tokens';
+import { isMorningAlarm } from '@/domain/mood/eligibility';
+import { startOfLocalDay } from '@/domain/schedule/relative';
+import { MoodCheckin } from '@/features/checkin/MoodCheckin';
 import { WakeChallenge } from '@/features/wake/WakeChallenge';
 import { useWakeMachine } from '@/features/wake/useWakeMachine';
 
@@ -25,14 +29,88 @@ try {
  */
 export default function WakeScreen() {
   const { state, submit, digit, backspace, abortForDevelopment } = useWakeMachine();
+  const [showCheckin, setShowCheckin] = useState(false);
+  const checkinSessionIdRef = useRef<string | null>(null);
+  const lastSessionRef = useRef<{ sessionId: string; alarmHour: number } | null>(null);
+
+  if (state.phase === 'solving' || state.phase === 'dismissing') {
+    lastSessionRef.current = {
+      sessionId: state.progress.sessionId,
+      alarmHour: state.progress.alarmHour,
+    };
+  }
 
   useEffect(() => {
     if (state.phase !== 'closed') return;
-    // `replace`, not `back`: the screen may be the first and only entry in the
-    // stack when the alarm launched the app cold, and there would be nothing
-    // behind it to go back to.
-    router.replace('/(tabs)');
-  }, [state.phase]);
+
+    if (state.outcome !== 'solved') {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    const sessionInfo = lastSessionRef.current;
+    if (!sessionInfo) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    let cancelled = false;
+
+    async function evaluateEligibility(info: { sessionId: string; alarmHour: number }) {
+      try {
+        if (!isMorningAlarm(info.alarmHour)) {
+          if (!cancelled) router.replace('/(tabs)');
+          return;
+        }
+
+        const now = Date.now();
+        const todayStartMs = startOfLocalDay(now);
+        const tomorrowDate = new Date(now);
+        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        const tomorrowStartMs = startOfLocalDay(tomorrowDate.getTime());
+
+        const alreadyConsumed = await sessionsRepo.hasSolvedMorningSession(
+          info.sessionId,
+          todayStartMs,
+          tomorrowStartMs
+        );
+
+        if (cancelled) return;
+
+        if (alreadyConsumed) {
+          router.replace('/(tabs)');
+        } else {
+          checkinSessionIdRef.current = info.sessionId;
+          setShowCheckin(true);
+        }
+      } catch (err) {
+        console.warn('[wake] error checking checkin eligibility', err);
+        if (!cancelled) router.replace('/(tabs)');
+      }
+    }
+
+    void evaluateEligibility(sessionInfo);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state.phase, state.phase === 'closed' ? state.outcome : null]);
+
+  if (showCheckin && checkinSessionIdRef.current) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <MoodCheckin
+          sessionId={checkinSessionIdRef.current}
+          onDone={() => {
+            setShowCheckin(false);
+            lastSessionRef.current = null;
+            router.replace('/(tabs)');
+          }}
+        />
+      </>
+    );
+  }
 
   if (state.phase === 'resolving' || state.phase === 'closed') {
     return (

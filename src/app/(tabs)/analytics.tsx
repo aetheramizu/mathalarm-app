@@ -103,6 +103,74 @@ export default function AnalyticsScreen() {
           <OutcomeBar segments={outcomeSegments(stats)} />
         </Card>
 
+        {/* Morning Moods */}
+        <Card style={styles.panel}>
+          <View style={styles.sectionHeader}>
+            <Text style={Type.labelSm}>MORNING MOODS</Text>
+            {summary.totalMoodSessions > 0 ? (
+              <Text style={Type.bodySm}>{summary.totalMoodSessions} recorded</Text>
+            ) : null}
+          </View>
+          {summary.totalMoodSessions === 0 ? (
+            <Text style={Type.bodySm}>
+              Complete a morning check-in to see your mood patterns.
+            </Text>
+          ) : (
+            <OutcomeBar
+              segments={summary.moodDistribution.map((m) => ({
+                label: `${m.emoji} ${m.label}`,
+                count: m.count,
+                color: m.color,
+              }))}
+            />
+          )}
+        </Card>
+
+        {/* Performance by Mood */}
+        <Card style={styles.panel}>
+          <Text style={Type.labelSm}>PERFORMANCE BY MOOD</Text>
+          <Text style={Type.bodySm}>
+            Average solving time and accuracy recorded during morning check-ins with at least 3 sessions.
+          </Text>
+          {summary.moodPerformance.length === 0 ? (
+            <View style={styles.moodEmptyNotice}>
+              <Text style={[Type.bodySm, { color: Color.textMuted }]}>
+                Check in on a few more mornings to see how you perform across different moods (at least 3 sessions required per mood).
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.moodPerformanceList}>
+              {summary.moodPerformance.map((item) => (
+                <View key={item.mood} style={styles.moodPerformanceCard}>
+                  <View style={styles.moodPerformanceHead}>
+                    <View style={styles.moodBadgeRow}>
+                      <Text style={styles.moodEmoji}>{item.emoji}</Text>
+                      <Text style={[Type.titleLg, { color: Color.textPrimary }]}>{item.label}</Text>
+                    </View>
+                    <Text style={[Type.labelSm, { color: Color.textSecondary }]}>
+                      {item.count} {item.count === 1 ? 'session' : 'sessions'}
+                    </Text>
+                  </View>
+                  <View style={styles.moodStatsRow}>
+                    <View style={styles.moodStatCol}>
+                      <Text style={Type.labelSm}>ACCURACY</Text>
+                      <Text style={[styles.moodStatValue, { color: item.color }]}>
+                        {formatPercent(item.accuracy)}
+                      </Text>
+                    </View>
+                    <View style={styles.moodStatCol}>
+                      <Text style={Type.labelSm}>PER PROBLEM</Text>
+                      <Text style={styles.moodStatValue}>
+                        {formatSeconds(item.averageSolveMsPerProblem)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </Card>
+
         <View style={styles.history}>
           <Text style={Type.headlineSm}>Recent wake-ups</Text>
           <Card style={styles.panelFlush}>
@@ -271,5 +339,53 @@ const styles = StyleSheet.create({
   emptyBody: {
     textAlign: 'center',
     maxWidth: 320,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  moodEmptyNotice: {
+    paddingVertical: Space.xs,
+  },
+  moodPerformanceList: {
+    gap: Space.sm,
+    marginTop: Space.xs,
+  },
+  moodPerformanceCard: {
+    backgroundColor: Color.cardElevated,
+    borderRadius: Radius.md,
+    padding: Space.md,
+    gap: Space.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Color.border,
+  },
+  moodPerformanceHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  moodBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  moodEmoji: {
+    fontSize: 20,
+  },
+  moodStatsRow: {
+    flexDirection: 'row',
+    gap: Space.xl,
+    marginTop: Space.xxs,
+  },
+  moodStatCol: {
+    gap: 2,
+  },
+  moodStatValue: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: -0.4,
+    color: Color.textPrimary,
   },
 });

@@ -1,3 +1,4 @@
+import { MOODS, type Mood } from '../mood/types';
 import { localDayOffset, startOfLocalDay } from '../schedule/relative';
 
 /**
@@ -20,6 +21,7 @@ export type SessionRecord = {
   correctCount: number;
   wrongCount: number;
   requiredProblems: number;
+  mood?: string | null;
 };
 
 export type WindowSummary = {
@@ -38,6 +40,25 @@ export type WindowSummary = {
   averageSolveMsPerProblem: number | null;
 };
 
+export type MoodDistributionItem = {
+  mood: Mood;
+  label: string;
+  emoji: string;
+  color: string;
+  count: number;
+  percentage: number;
+};
+
+export type MoodPerformanceItem = {
+  mood: Mood;
+  label: string;
+  emoji: string;
+  color: string;
+  count: number;
+  accuracy: number | null;
+  averageSolveMsPerProblem: number | null;
+};
+
 export type AnalyticsSummary = {
   /** Consecutive local days ending today or yesterday with at least one solved session. */
   streak: number;
@@ -47,6 +68,9 @@ export type AnalyticsSummary = {
   last30: WindowSummary;
   /** Closed sessions on record, all time. Zero means the empty state, not a dashboard of zeros. */
   totalSessions: number;
+  moodDistribution: MoodDistributionItem[];
+  moodPerformance: MoodPerformanceItem[];
+  totalMoodSessions: number;
 };
 
 export const WINDOW_DAYS = { short: 7, long: 30 } as const;
@@ -62,12 +86,60 @@ export function summarise(sessions: SessionRecord[], now: number): AnalyticsSumm
   const closed = sessions.filter((session) => session.outcome !== 'ringing');
   const streak = computeStreak(closed, now);
 
+  const moodSessions = closed.filter(
+    (s) => s.mood && MOODS.some((m) => m.key === s.mood)
+  );
+  const totalMoodSessions = moodSessions.length;
+
+  const moodDistribution: MoodDistributionItem[] = MOODS.map((m) => {
+    const count = moodSessions.filter((s) => s.mood === m.key).length;
+    const percentage = totalMoodSessions > 0 ? Math.round((count / totalMoodSessions) * 100) : 0;
+    return {
+      mood: m.key,
+      label: m.label,
+      emoji: m.emoji,
+      color: m.color,
+      count,
+      percentage,
+    };
+  });
+
+  const moodPerformance: MoodPerformanceItem[] = [];
+  for (const m of MOODS) {
+    const forMood = moodSessions.filter((s) => s.mood === m.key && s.outcome === 'solved');
+    if (forMood.length >= 3) {
+      let correct = 0;
+      let wrong = 0;
+      for (const s of forMood) {
+        correct += s.correctCount;
+        wrong += s.wrongCount;
+      }
+      const perProblem = forMood
+        .filter((s) => s.firstAnswerAt !== null && s.requiredProblems > 0)
+        .map((s) => solveMs(s) / s.requiredProblems)
+        .filter((value) => Number.isFinite(value));
+
+      moodPerformance.push({
+        mood: m.key,
+        label: m.label,
+        emoji: m.emoji,
+        color: m.color,
+        count: forMood.length,
+        accuracy: correct + wrong === 0 ? null : correct / (correct + wrong),
+        averageSolveMsPerProblem: mean(perProblem),
+      });
+    }
+  }
+
   return {
     streak: streak.length,
     streakIncludesToday: streak.includesToday,
     last7: summariseWindow(closed, now, WINDOW_DAYS.short),
     last30: summariseWindow(closed, now, WINDOW_DAYS.long),
     totalSessions: closed.length,
+    moodDistribution,
+    moodPerformance,
+    totalMoodSessions,
   };
 }
 

@@ -1,4 +1,5 @@
 import type { Difficulty, Problem } from '@/domain/math/types';
+import type { Mood } from '@/domain/mood/types';
 
 /**
  * The application-facing shapes, and the mappers between them and the raw
@@ -85,6 +86,8 @@ export type WakeSession = {
   wrongCount: number;
   /** `dismissedAt - firstAnswerAt`: time spent solving, not time spent ringing. */
   solveMs: number | null;
+  mood: Mood | null;
+  alarmHour: number | null;
 };
 
 export type WakeSessionRow = {
@@ -100,6 +103,8 @@ export type WakeSessionRow = {
   correct_count: number;
   wrong_count: number;
   solve_ms: number | null;
+  mood: string | null;
+  alarm_hour: number | null;
 };
 
 export function toWakeSession(row: WakeSessionRow): WakeSession {
@@ -116,6 +121,8 @@ export function toWakeSession(row: WakeSessionRow): WakeSession {
     correctCount: row.correct_count,
     wrongCount: row.wrong_count,
     solveMs: row.solve_ms,
+    mood: (row.mood as Mood | null) ?? null,
+    alarmHour: row.alarm_hour ?? null,
   };
 }
 

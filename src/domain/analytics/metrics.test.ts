@@ -220,3 +220,77 @@ describe('streak', () => {
     assert.equal(summarise(sessions, now).streak, 4);
   });
 });
+
+describe('mood analytics', () => {
+  it('handles empty mood history gracefully', () => {
+    const summary = summarise([session(), session()], NOW);
+    assert.equal(summary.totalMoodSessions, 0);
+    assert.equal(summary.moodPerformance.length, 0);
+    assert.equal(summary.moodDistribution.length, 4);
+    for (const item of summary.moodDistribution) {
+      assert.equal(item.count, 0);
+      assert.equal(item.percentage, 0);
+    }
+  });
+
+  it('calculates mood distribution percentages across recorded moods', () => {
+    const sessions = [
+      session({ mood: 'happy' }),
+      session({ mood: 'happy' }),
+      session({ mood: 'sad' }),
+      session({ mood: 'excited' }),
+      session({ mood: null }), // skipped check-in
+    ];
+    const summary = summarise(sessions, NOW);
+    assert.equal(summary.totalMoodSessions, 4);
+
+    const happy = summary.moodDistribution.find((m) => m.mood === 'happy')!;
+    const sad = summary.moodDistribution.find((m) => m.mood === 'sad')!;
+    const excited = summary.moodDistribution.find((m) => m.mood === 'excited')!;
+    const angry = summary.moodDistribution.find((m) => m.mood === 'angry')!;
+
+    assert.equal(happy.count, 2);
+    assert.equal(happy.percentage, 50);
+    assert.equal(sad.count, 1);
+    assert.equal(sad.percentage, 25);
+    assert.equal(excited.count, 1);
+    assert.equal(excited.percentage, 25);
+    assert.equal(angry.count, 0);
+    assert.equal(angry.percentage, 0);
+  });
+
+  it('requires at least 3 solved sessions before surfacing performance by mood', () => {
+    // 2 happy sessions: insufficient sample size (< 3)
+    const sessions2 = [
+      session({ mood: 'happy', correctCount: 3, wrongCount: 0 }),
+      session({ mood: 'happy', correctCount: 2, wrongCount: 1 }),
+    ];
+    const summary2 = summarise(sessions2, NOW);
+    assert.equal(summary2.moodPerformance.length, 0, '2 sessions should not appear in performance');
+
+    // 3 happy sessions: meets minimum threshold (>= 3)
+    const sessions3 = [
+      ...sessions2,
+      session({ mood: 'happy', correctCount: 3, wrongCount: 0 }),
+    ];
+    const summary3 = summarise(sessions3, NOW);
+    assert.equal(summary3.moodPerformance.length, 1);
+    const perf = summary3.moodPerformance[0];
+    assert.equal(perf.mood, 'happy');
+    assert.equal(perf.count, 3);
+    assert.ok(perf.accuracy !== null);
+    assert.ok(perf.averageSolveMsPerProblem !== null);
+  });
+
+  it('only calculates mood performance for solved sessions', () => {
+    const sessions = [
+      session({ mood: 'angry', outcome: 'solved' }),
+      session({ mood: 'angry', outcome: 'solved' }),
+      session({ mood: 'angry', outcome: 'abandoned' }), // not solved
+    ];
+    const summary = summarise(sessions, NOW);
+    // Only 2 solved angry sessions, so performance is not shown
+    assert.equal(summary.moodPerformance.length, 0);
+  });
+});
+

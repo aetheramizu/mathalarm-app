@@ -75,6 +75,7 @@ export async function resolveWake(): Promise<WakeProgress | null> {
     }
 
     if (session?.outcome === 'ringing') {
+      const alarm = await alarmsRepo.getById(session.alarmId);
       return {
         sessionId: session.id,
         alarmId: session.alarmId,
@@ -89,6 +90,7 @@ export async function resolveWake(): Promise<WakeProgress | null> {
         problemShownAt: Date.now(),
         firedAt: session.firedAt,
         firstAnswerAt: existing.firstAnswerAt,
+        alarmHour: session.alarmHour ?? alarm?.hour ?? -1,
       };
     }
   }
@@ -111,6 +113,7 @@ async function startChallenge(
   const difficulty = alarm?.difficulty ?? (await settingsRepo.getDefaultDifficulty());
   const requiredProblems = REQUIRED_PROBLEMS[difficulty];
   const label = alarm?.label ?? nativeLabel;
+  const alarmHour = alarm?.hour ?? -1;
 
   // A session may already have been opened for this exact ring — the app can
   // die after the insert and before the challenge row is written. Reusing it
@@ -124,6 +127,7 @@ async function startChallenge(
       difficulty,
       requiredProblems,
       firedAt,
+      alarmHour,
     }));
 
   const problem = generateProblem(difficulty);
@@ -141,6 +145,7 @@ async function startChallenge(
     problemShownAt: now,
     firedAt: session.firedAt,
     firstAnswerAt: session.firstAnswerAt,
+    alarmHour: session.alarmHour ?? alarmHour,
   };
 
   await saveProgress(progress);

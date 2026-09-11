@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { WakeSession } from '@/data/models';
 import { Color, Space } from '@/design/tokens';
 import { Type } from '@/design/typography';
+import { MOODS } from '@/domain/mood/types';
 import { Chip, type ChipTone } from '@/ui/chip';
 
 import { NO_VALUE, formatDuration, formatOutcome, formatSeconds, formatSessionWhen } from './format';
@@ -27,6 +28,8 @@ export function SessionRow({ session, last }: { session: WakeSession; last?: boo
   const answered = session.correctCount + session.wrongCount;
   const dismissMs =
     session.dismissedAt === null ? null : session.dismissedAt - session.firedAt;
+  const moodItem = session.mood ? MOODS.find((m) => m.key === session.mood) : null;
+  const moodPrefix = moodItem ? `${moodItem.emoji} ` : '';
 
   return (
     <View style={[styles.row, last && styles.rowLast]}>
@@ -36,7 +39,7 @@ export function SessionRow({ session, last }: { session: WakeSession; last?: boo
       </View>
 
       <Text style={Type.bodyMd} numberOfLines={1}>
-        {session.alarmLabel ?? 'No label'} · {session.difficulty}
+        {moodPrefix}{session.alarmLabel ?? 'No label'} · {session.difficulty}
       </Text>
 
       <View style={styles.metrics}>

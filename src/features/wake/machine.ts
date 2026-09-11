@@ -31,6 +31,7 @@ export type WakeProgress = {
   problemShownAt: number;
   firedAt: number;
   firstAnswerAt: number | null;
+  alarmHour: number;
 };
 
 /** Why the screen closed. `no_alarm` means there was nothing ringing to begin with. */

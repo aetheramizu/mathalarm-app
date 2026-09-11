@@ -1,4 +1,5 @@
 import type { Difficulty, Problem } from '@/domain/math/types';
+import type { Mood } from '@/domain/mood/types';
 
 import { getDb } from '../db';
 import { newId } from '../ids';
@@ -15,6 +16,7 @@ export type SessionStart = {
   difficulty: Difficulty;
   requiredProblems: number;
   firedAt: number;
+  alarmHour?: number | null;
 };
 
 export type AnswerRecord = {
@@ -28,7 +30,8 @@ export type AnswerRecord = {
 
 const SELECT = `
   SELECT id, alarm_id, alarm_label, difficulty, required_problems, fired_at,
-         first_answer_at, dismissed_at, outcome, correct_count, wrong_count, solve_ms
+         first_answer_at, dismissed_at, outcome, correct_count, wrong_count, solve_ms,
+         mood, alarm_hour
   FROM wake_sessions
 `;
 
@@ -45,9 +48,17 @@ export async function start(input: SessionStart): Promise<WakeSession> {
 
   await db.runAsync(
     `INSERT INTO wake_sessions
-       (id, alarm_id, alarm_label, difficulty, required_problems, fired_at, outcome)
-     VALUES (?, ?, ?, ?, ?, ?, 'ringing')`,
-    [id, input.alarmId, input.alarmLabel, input.difficulty, input.requiredProblems, input.firedAt]
+       (id, alarm_id, alarm_label, difficulty, required_problems, fired_at, outcome, alarm_hour)
+     VALUES (?, ?, ?, ?, ?, ?, 'ringing', ?)`,
+    [
+      id,
+      input.alarmId,
+      input.alarmLabel,
+      input.difficulty,
+      input.requiredProblems,
+      input.firedAt,
+      input.alarmHour ?? null,
+    ]
   );
 
   return {
@@ -63,7 +74,43 @@ export async function start(input: SessionStart): Promise<WakeSession> {
     correctCount: 0,
     wrongCount: 0,
     solveMs: null,
+    mood: null,
+    alarmHour: input.alarmHour ?? null,
   };
+}
+
+export async function setMood(sessionId: string, mood: Mood): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE wake_sessions SET mood = ? WHERE id = ? AND outcome = 'solved'`,
+    [mood, sessionId]
+  );
+}
+
+/**
+ * Whether a solved morning-window session already exists on the given
+ * local calendar day, excluding the session that is asking.
+ *
+ * Used to enforce the "one check-in per day" rule. The morning window
+ * is [04:00, 14:00) and is checked against the snapshotted alarm_hour,
+ * not against fired_at.
+ */
+export async function hasSolvedMorningSession(
+  excludeSessionId: string,
+  dayStartMs: number,
+  dayEndMs: number
+): Promise<boolean> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ found: number }>(
+    `SELECT 1 AS found FROM wake_sessions
+     WHERE outcome = 'solved'
+       AND alarm_hour >= 4 AND alarm_hour < 14
+       AND fired_at >= ? AND fired_at < ?
+       AND id != ?
+     LIMIT 1`,
+    [dayStartMs, dayEndMs, excludeSessionId]
+  );
+  return row !== null;
 }
 
 /**

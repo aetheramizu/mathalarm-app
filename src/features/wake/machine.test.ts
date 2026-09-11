@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { Problem } from '@/domain/math/types';
+import type { Problem } from '../../domain/math/types';
 
 import {
   MAX_ENTRY,
@@ -37,6 +37,7 @@ function progress(overrides: Partial<WakeProgress> = {}): WakeProgress {
     problemShownAt: 1000,
     firedAt: 1000,
     firstAnswerAt: null,
+    alarmHour: 7,
     ...overrides,
   };
 }

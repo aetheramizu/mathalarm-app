@@ -1,6 +1,7 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { up as migration001 } from './migrations/001_init';
+import { up as migration002 } from './migrations/002_add_mood';
 
 const DATABASE_NAME = 'mathalarm.db';
 
@@ -9,7 +10,10 @@ const DATABASE_NAME = 'mathalarm.db';
  * entries are never reordered, edited after shipping, or removed — a released
  * database has already run them.
  */
-const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [migration001];
+const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
+  migration001,
+  migration002,
+];
 
 let connection: Promise<SQLiteDatabase> | null = null;
 
