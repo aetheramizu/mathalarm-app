@@ -55,7 +55,11 @@ export function Sheet({ visible, title, onClose, children, header, footer }: Pro
           accessibilityRole="button"
           accessibilityLabel="Close"
         />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Space.md) }]}>
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: insets.bottom > 0 ? insets.bottom + Space.lg : Space.xl },
+          ]}>
           <View style={styles.header}>
             <Text style={[Type.titleLg, styles.title]} numberOfLines={1}>
               {title}

@@ -43,16 +43,13 @@ const styles = StyleSheet.create({
 });
 
 /**
- * How much room a scrolling tab screen has to leave at the bottom.
+ * How much room a scrolling tab screen leaves at the bottom.
  *
- * The tab bar floats over the content, and Android draws the whole window
- * under the gesture pill or the three-button bar, so the strip the system
- * claims has to be counted as well as the bar itself. This mirrors the height
- * `(tabs)/_layout` gives the bar — `tabBar` plus the same bottom inset — and
- * adds one gutter on top, so the last row clears the bar by the same margin on
- * a gesture phone and a three-button one.
+ * The tab bar is part of the document flow above the Android navigation area,
+ * so the screen's viewport naturally ends at the top of the tab bar. We provide
+ * a clean bottom breathing room equal to `Layout.screenPadding` so the last card
+ * or row does not touch the tab bar's top border.
  */
 export function useTabContentInset(): number {
-  const insets = useSafeAreaInsets();
-  return insets.bottom + Layout.tabBar + Layout.screenPadding;
+  return Layout.screenPadding;
 }
